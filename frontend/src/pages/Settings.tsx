@@ -4,17 +4,20 @@ import { useTranslation } from 'react-i18next';
 import { triggerLockdown, triggerUnlock, kickAllUsers, getSystemState, setSystemState } from '../api/admin';
 import { getErrorMessage } from '../api/client';
 import { resetStuckDocuments } from '../api/documents';
+import { getModels } from '../api/models';
 import { AppSettings, getAppSettings, updateAppSettings } from '../api/settings';
+import { OllamaModel } from '../types/models';
 
 const Settings: React.FC = () => {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<AppSettings>({
     system_prompt: '',
     sync_mode: 'SYNC_AUTO',
-    default_model: 'llama3.1:8b',
+    default_model: '',
     telegram_bot_token: '',
     telegram_chat_id: '',
   });
+  const [availableModels, setAvailableModels] = useState<OllamaModel[]>([]);
   const [appState, setAppState] = useState<string>('SEARCH');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,19 +28,21 @@ const Settings: React.FC = () => {
     
     const fetchData = async () => {
       try {
-        const [settingsData, stateData] = await Promise.all([
+        const [settingsData, stateData, modelsData] = await Promise.all([
           getAppSettings(),
-          getSystemState()
+          getSystemState(),
+          getModels()
         ]);
         
         setSettings({
           system_prompt: settingsData.system_prompt || '',
           sync_mode: settingsData.sync_mode || 'SYNC_AUTO',
-          default_model: settingsData.default_model || 'llama3.1:8b',
+          default_model: settingsData.default_model || '',
           telegram_bot_token: settingsData.telegram_bot_token || '',
           telegram_chat_id: settingsData.telegram_chat_id || '',
         });
         setAppState(stateData.state);
+        setAvailableModels(modelsData.models || []);
       } catch (err: unknown) {
         setError(getErrorMessage(err, t('settings_actions.load_error', 'Failed to load settings')));
       } finally {
@@ -215,15 +220,20 @@ const Settings: React.FC = () => {
           <p className="text-sm text-gray-400 mb-4">
             {t('settings.default_model_description', 'Used for chat requests when the client does not specify a model explicitly.')}
           </p>
-          <input
-            type="text"
+          <select
             name="default_model"
             value={settings.default_model || ''}
             onChange={handleChange}
-            placeholder="llama3.1:8b"
             className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded focus:ring-2 focus:ring-blue-500 text-white"
             disabled={loading}
-          />
+          >
+            <option value="">-- {t('chat.select_model', 'Select model')} --</option>
+            {availableModels.map((m) => (
+              <option key={m.name} value={m.name}>
+                {m.name} ({Math.round(m.size / 1024 / 1024 / 1024 * 100) / 100} GB)
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
