@@ -118,7 +118,7 @@ def cleanup_old_metrics():
 
 @celery_app.task(name="app.worker.tasks.ocr_heavy", bind=True, max_retries=3)
 def ocr_heavy(self, doc_id: int):
-    logger.info(f"Starting OCR task for document ID: {doc_id}")
+    logger.info(f"!!! [TASK START] Starting OCR/DOCX processing for document ID: {doc_id} !!!")
     db: Session = SessionLocal()
     doc = db.query(Document).filter(Document.id == doc_id).first()
     

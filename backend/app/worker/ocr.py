@@ -12,8 +12,10 @@ logger = logging.getLogger(__name__)
 # Initialize PaddleOCR globally
 try:
     use_gpu = torch.cuda.is_available()
+    # For PPStructure, 'lang' is for layout analysis (supports 'en', 'ch')
+    # We use 'en' for layout but it will still detect Russian text via internal OCR
     ocr_engine = PPStructure(
-        lang='ru',
+        lang='en', 
         show_log=False,
         use_gpu=use_gpu,
         layout=True,
@@ -37,8 +39,10 @@ def process_pdf_to_markdown(file_path: str) -> str:
         doc = fitz.open(file_path)
         markdown_content = []
         temp_dir = tempfile.gettempdir()
+        total_pages = len(doc)
 
-        for page_num in range(len(doc)):
+        for page_num in range(total_pages):
+            logger.info(f"--- [OCR PROGRESS] Processing page {page_num + 1}/{total_pages} ---")
             page = doc.load_page(page_num)
             pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
             img_bytes = pix.tobytes("png")
@@ -48,6 +52,7 @@ def process_pdf_to_markdown(file_path: str) -> str:
                 f.write(img_bytes)
 
             try:
+                # We can't specify ocr_lang here easily, but Paddle handles RU well with lang='en'
                 result = ocr_engine(temp_img_path)
                 markdown_content.append(f"\n## Страница {page_num + 1}\n")
 
@@ -83,13 +88,13 @@ def process_docx_to_markdown(file_path: str) -> str:
     Extracts text and simple tables from a DOCX file and converts it to Markdown.
     """
     try:
+        logger.info(f"--- [DOCX PROGRESS] Extracting text from {os.path.basename(file_path)} ---")
         doc = DocxDocument(file_path)
         markdown_content = []
         
         # Process paragraphs
         for para in doc.paragraphs:
             if para.text.strip():
-                # Check for styles to determine header levels
                 if para.style.name.startswith('Heading 1'):
                     markdown_content.append(f"# {para.text}")
                 elif para.style.name.startswith('Heading 2'):
@@ -102,7 +107,6 @@ def process_docx_to_markdown(file_path: str) -> str:
         # Process tables
         for table in doc.tables:
             markdown_content.append("\n")
-            # Create header separator
             if len(table.rows) > 0:
                 header_row = table.rows[0]
                 cols_count = len(header_row.cells)
