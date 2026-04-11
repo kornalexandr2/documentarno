@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { triggerLockdown, triggerUnlock, kickAllUsers } from '../api/admin';
+import { triggerLockdown, triggerUnlock, kickAllUsers, getSystemState, setSystemState } from '../api/admin';
 import { getErrorMessage } from '../api/client';
 import { AppSettings, getAppSettings, updateAppSettings } from '../api/settings';
 
@@ -14,24 +14,37 @@ const Settings: React.FC = () => {
     telegram_bot_token: '',
     telegram_chat_id: '',
   });
+  const [appState, setAppState] = useState<string>('SEARCH');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
-    getAppSettings()
-      .then((data) => {
+    
+    const fetchData = async () => {
+      try {
+        const [settingsData, stateData] = await Promise.all([
+          getAppSettings(),
+          getSystemState()
+        ]);
+        
         setSettings({
-          system_prompt: data.system_prompt || '',
-          sync_mode: data.sync_mode || 'SYNC_AUTO',
-          default_model: data.default_model || 'llama3.1:8b',
-          telegram_bot_token: data.telegram_bot_token || '',
-          telegram_chat_id: data.telegram_chat_id || '',
+          system_prompt: settingsData.system_prompt || '',
+          sync_mode: settingsData.sync_mode || 'SYNC_AUTO',
+          default_model: settingsData.default_model || 'llama3.1:8b',
+          telegram_bot_token: settingsData.telegram_bot_token || '',
+          telegram_chat_id: settingsData.telegram_chat_id || '',
         });
-      })
-      .catch((err: unknown) => setError(getErrorMessage(err, t('settings_actions.load_error', 'Failed to load settings'))))
-      .finally(() => setLoading(false));
+        setAppState(stateData.state);
+      } catch (err: unknown) {
+        setError(getErrorMessage(err, t('settings_actions.load_error', 'Failed to load settings')));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void fetchData();
   }, [t]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -57,19 +70,34 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleAction = async (action: 'lockdown' | 'unlock' | 'kick') => {
+  const handleAction = async (action: 'lockdown' | 'unlock' | 'kick' | 'SEARCH' | 'PROCESSING') => {
     try {
       setLoading(true);
       setError(null);
       if (action === 'lockdown') await triggerLockdown();
-      if (action === 'unlock') await triggerUnlock();
-      if (action === 'kick') await kickAllUsers();
+      else if (action === 'unlock') await triggerUnlock();
+      else if (action === 'kick') await kickAllUsers();
+      else if (action === 'SEARCH' || action === 'PROCESSING') await setSystemState(action);
+      
+      // Refresh state
+      const stateData = await getSystemState();
+      setAppState(stateData.state);
+      
       setSuccessMsg(t('settings_actions.action_success', { action }));
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: unknown) {
       setError(getErrorMessage(err, t('settings_actions.action_error', { action })));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getStateLabel = (state: string) => {
+    switch (state) {
+      case 'SEARCH': return t('system_state.state_search');
+      case 'PROCESSING': return t('system_state.state_processing');
+      case 'LOCKDOWN': return t('system_state.state_lockdown');
+      default: return state;
     }
   };
 
@@ -89,28 +117,56 @@ const Settings: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-6 flex flex-wrap gap-4">
-        <button
-          onClick={() => void handleAction('lockdown')}
-          disabled={loading}
-          className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded font-bold disabled:opacity-50"
-        >
-          {t('settings_actions.lockdown')}
-        </button>
-        <button
-          onClick={() => void handleAction('unlock')}
-          disabled={loading}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded font-bold disabled:opacity-50"
-        >
-          {t('settings_actions.unlock')}
-        </button>
-        <button
-          onClick={() => void handleAction('kick')}
-          disabled={loading}
-          className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded font-bold disabled:opacity-50"
-        >
-          {t('settings_actions.kick')}
-        </button>
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-6">
+        <h2 className="text-xl mb-2 font-semibold">{t('system_state.title')}</h2>
+        <p className="text-sm text-gray-400 mb-4">{t('system_state.description')}</p>
+        
+        <div className="flex items-center space-x-4 mb-6 p-3 bg-gray-900 rounded border border-gray-700">
+          <span className="text-gray-400">{t('system_state.current')}</span>
+          <span className={`font-bold px-3 py-1 rounded ${appState === 'LOCKDOWN' ? 'bg-red-600' : appState === 'PROCESSING' ? 'bg-blue-600' : 'bg-green-600'}`}>
+            {getStateLabel(appState)}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-4">
+          <button
+            onClick={() => void handleAction('SEARCH')}
+            disabled={loading || appState === 'SEARCH'}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded font-bold disabled:opacity-50"
+          >
+            {t('system_state.btn_change', { state: 'SEARCH' })}
+          </button>
+          <button
+            onClick={() => void handleAction('PROCESSING')}
+            disabled={loading || appState === 'PROCESSING'}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-bold disabled:opacity-50"
+          >
+            {t('system_state.btn_change', { state: 'PROCESSING' })}
+          </button>
+          <button
+            onClick={() => void handleAction('lockdown')}
+            disabled={loading || appState === 'LOCKDOWN'}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded font-bold disabled:opacity-50"
+          >
+            {t('settings_actions.lockdown')}
+          </button>
+          {appState === 'LOCKDOWN' && (
+            <button
+              onClick={() => void handleAction('unlock')}
+              disabled={loading}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded font-bold"
+            >
+              {t('settings_actions.unlock')}
+            </button>
+          )}
+          <button
+            onClick={() => void handleAction('kick')}
+            disabled={loading}
+            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded font-bold disabled:opacity-50"
+          >
+            {t('settings_actions.kick')}
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">

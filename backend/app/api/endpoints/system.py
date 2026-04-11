@@ -90,6 +90,38 @@ async def get_user_from_token(token: str, db: Session) -> User | None:
     return user
 
 
+@router.get("/state")
+async def get_system_state(
+    redis_client: redis.Redis = Depends(get_redis),
+    current_user: User = Depends(get_current_admin_user)
+):
+    state = await redis_client.get("APP_STATE")
+    return {"state": state.decode() if state else "SEARCH"}
+
+
+@router.post("/state")
+async def set_system_state(
+    new_state: str = Query(..., regex="^(SEARCH|PROCESSING|LOCKDOWN)$"),
+    redis_client: redis.Redis = Depends(get_redis),
+    current_user: User = Depends(get_current_superadmin_user),
+    db: Session = Depends(get_db)
+):
+    if new_state == "LOCKDOWN":
+        # Reuse existing lockdown logic
+        return await trigger_lockdown(current_user, redis_client, db)
+    
+    # If moving FROM lockdown, we should theoretically restore nginx, 
+    # but here we just set the state in Redis for simplicity of logic
+    await redis_client.set("APP_STATE", new_state)
+    
+    audit = AuditLog(event="STATE_CHANGED", payload={"new_state": new_state, "by": current_user.username})
+    db.add(audit)
+    db.commit()
+    
+    await emit_event("STATE_CHANGED", {"new_state": new_state, "by": current_user.username})
+    return {"status": "success", "new_state": new_state}
+
+
 @router.post("/lockdown")
 async def trigger_lockdown(
     current_user: User = Depends(get_current_superadmin_user),

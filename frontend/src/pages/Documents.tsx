@@ -158,11 +158,11 @@ const Documents: React.FC = () => {
                       <td className="py-3 px-4 font-medium">{doc.source_path}</td>
                       <td className="py-3 px-4">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(doc.status)}`}>
-                          {doc.status}
+                          {t('documents.status_' + doc.status.toLowerCase(), doc.status)}
                         </span>
                       </td>
                       <td className={`py-3 px-4 font-semibold text-sm ${getPriorityColor(doc.priority)}`}>
-                        {doc.priority}
+                        {t('documents.prio_' + doc.priority.toLowerCase(), doc.priority)}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-400">
                         {new Date(doc.created_at).toLocaleString()}
