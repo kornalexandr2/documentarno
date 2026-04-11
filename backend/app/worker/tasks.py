@@ -2,6 +2,7 @@ import logging
 import os
 import torch
 import redis
+import json
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
@@ -30,7 +31,7 @@ def check_and_emit_alert(redis_conn: redis.Redis, alert_type: str, alert_key: st
         redis_conn.setex(cooldown_key, 3600, "1")
         logger.warning(f"Emitted alert: {message}")
 
-@celery_app.task(name="collect_system_metrics")
+@celery_app.task(name="app.worker.tasks.collect_system_metrics")
 def collect_system_metrics():
     logger.info("Collecting system metrics...")
     db: Session = SessionLocal()
@@ -100,7 +101,7 @@ def collect_system_metrics():
         if redis_conn is not None:
             redis_conn.close()
 
-@celery_app.task(name="cleanup_old_metrics")
+@celery_app.task(name="app.worker.tasks.cleanup_old_metrics")
 def cleanup_old_metrics():
     logger.info("Cleaning up old system metrics...")
     db: Session = SessionLocal()
@@ -115,7 +116,7 @@ def cleanup_old_metrics():
     finally:
         db.close()
 
-@celery_app.task(name="ocr_heavy", bind=True, max_retries=3)
+@celery_app.task(name="app.worker.tasks.ocr_heavy", bind=True, max_retries=3)
 def ocr_heavy(self, doc_id: int):
     logger.info(f"Starting OCR task for document ID: {doc_id}")
     db: Session = SessionLocal()
@@ -167,11 +168,13 @@ def ocr_heavy(self, doc_id: int):
             # Remove the processed item from queue (iterate and remove matching doc_id)
             queue_items = r.lrange("OCR_QUEUE", 0, -1)
             for item in queue_items:
-                import json
-                data = json.loads(item)
-                if data.get("doc_id") == doc_id:
-                    r.lrem("OCR_QUEUE", 0, item)
-                    break
+                try:
+                    data = json.loads(item)
+                    if data.get("doc_id") == doc_id:
+                        r.lrem("OCR_QUEUE", 0, item)
+                        break
+                except Exception:
+                    continue
             r.close()
         except Exception as e:
             logger.warning(f"Failed to update OCR_QUEUE: {e}")

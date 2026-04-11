@@ -84,7 +84,7 @@ async def upload_document(
     db.commit()
     db.refresh(new_doc)
 
-    ocr_heavy.delay(new_doc.id)
+    ocr_heavy.apply_async(args=[new_doc.id], task_id=f"ocr_{new_doc.id}")
 
     return new_doc
 
