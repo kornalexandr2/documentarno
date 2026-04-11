@@ -1,0 +1,29 @@
+fastapi==0.104.1
+uvicorn==0.24.0.post1
+sqlalchemy==2.0.23
+alembic==1.12.1
+psycopg2-binary==2.9.9
+redis==5.0.1
+celery==5.3.6
+qdrant-client==1.6.4
+psutil==5.9.6
+pynvml==11.5.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+httpx==0.25.2
+aiofiles==23.2.1
+numpy==1.24.4
+pillow==10.1.0
+paddlepaddle-gpu==2.5.2; sys_platform == 'linux'
+paddlepaddle==2.5.2; sys_platform == 'win32'
+paddleocr==2.7.0.3
+PyMuPDF==1.20.2
+sentence-transformers==2.5.1
+langchain-text-splitters==0.0.1
+markdownify==0.11.6
+watchdog==3.0.0
+python-telegram-bot==20.7
+bcrypt==3.2.0
+websockets==12.0
+python-docx==1.1.0
