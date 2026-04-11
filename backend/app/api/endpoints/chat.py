@@ -1,4 +1,4 @@
-﻿import json
+import json
 import logging
 import asyncio
 import httpx
@@ -20,34 +20,26 @@ router = APIRouter()
 
 async def ensure_model_loaded(model_name: str):
     """
-    Model Switching Algorithm (OOM Protection):
-    1. Unload current model (keep_alive: 0)
-    2. Wait 2 sec for NVIDIA driver to free memory
-    3. Check VRAM (skipped here since Ollama handles VRAM internally, but we simulate the delay)
-    4. Load new model
+    Model Switching logic. Ollama handles VRAM efficiently, 
+    but we ensure the model name is valid and provide a small delay if switching.
     """
-    timeout = httpx.Timeout(120.0, connect=30.0)
-    async with httpx.AsyncClient(timeout=timeout) as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             resp = await client.get(f"{OLLAMA_URL}/api/ps")
-            resp.raise_for_status()
-            running_models = resp.json().get("models", [])
-
-            for m in running_models:
-                if m["name"] != model_name:
-                    logger.info(f"Unloading model {m['name']} to free VRAM...")
-                    await client.post(
-                        f"{OLLAMA_URL}/api/generate",
-                        json={"model": m["name"], "prompt": "", "keep_alive": 0}
-                    )
-                    await asyncio.sleep(2.0)
+            if resp.status_code == 200:
+                running_models = resp.json().get("models", [])
+                is_running = any(m["name"] == model_name for m in running_models)
+                
+                if not is_running and len(running_models) > 0:
+                    logger.info(f"Switching to model {model_name}. Waiting for VRAM release...")
+                    # Ollama will unload automatically, we just add a small grace period
+                    await asyncio.sleep(1.0)
         except Exception as e:
-            logger.error(f"Error during model switching: {e}")
+            logger.warning(f"Optional model check failed: {e}")
 
 async def ollama_stream_generator(prompt: str, model_name: str):
     """
     Generator function to stream response from Ollama API.
-    Converts Ollama NDJSON format to SSE format expected by frontend.
     """
     await ensure_model_loaded(model_name)
 
@@ -56,15 +48,21 @@ async def ollama_stream_generator(prompt: str, model_name: str):
         "prompt": prompt,
         "stream": True,
         "options": {
-            "temperature": 0.1,
-            "top_p": 0.5
+            "temperature": 0.3,
+            "top_p": 0.9,
+            "num_ctx": 4096
         }
     }
 
-    timeout = httpx.Timeout(120.0, connect=30.0)
+    # High timeout for generation
+    timeout = httpx.Timeout(300.0, connect=10.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
         try:
             async with client.stream("POST", f"{OLLAMA_URL}/api/generate", json=payload) as response:
+                if response.status_code == 404:
+                    yield f"data: {{\"error\": \"Model '{model_name}' not found in Ollama. Please check settings.\"}}\n\n"
+                    return
+                
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     if not line:
@@ -74,9 +72,11 @@ async def ollama_stream_generator(prompt: str, model_name: str):
                         if "response" in data:
                             sse_data = json.dumps({"text": data["response"]})
                             yield f"data: {sse_data}\n\n"
+                        if data.get("done"):
+                            break
                     except json.JSONDecodeError:
-                        logger.warning(f"Failed to parse JSON from Ollama stream: {line}")
-        except httpx.RequestError as e:
+                        continue
+        except Exception as e:
             logger.error(f"Ollama API request failed: {e}")
             yield f"data: {{\"error\": \"LLM generation failed: {str(e)}\"}}\n\n"
 
@@ -103,48 +103,32 @@ async def chat_stream(
     if request.document_id:
         try:
             query_vector = await asyncio.to_thread(get_query_embedding, request.message)
-
             client = get_qdrant_client()
             search_filter = Filter(
-                must=[
-                    FieldCondition(
-                        key="doc_id",
-                        match=MatchValue(value=request.document_id)
-                    )
-                ]
+                must=[FieldCondition(key="doc_id", match=MatchValue(value=request.document_id))]
             )
-
             search_result = client.search(
                 collection_name=COLLECTION_NAME,
                 query_vector=query_vector.tolist(),
                 query_filter=search_filter,
                 limit=5
             )
-
             if search_result:
                 context_chunks = [hit.payload.get("text", "") for hit in search_result]
                 context_text = "\n\n---\n\n".join(context_chunks)
-                logger.info(f"Found {len(search_result)} relevant chunks for document {request.document_id}")
-            else:
-                logger.info(f"No relevant context found for document {request.document_id}")
-
         except Exception as e:
             logger.error(f"Vector search failed: {e}")
 
-    settings = {
-        setting.key: setting.value
-        for setting in db.query(SystemSetting)
-        .filter(SystemSetting.key.in_(["system_prompt", "default_model"]))
-        .all()
-    }
+    settings_list = db.query(SystemSetting).filter(SystemSetting.key.in_(["system_prompt", "default_model"])).all()
+    settings = {s.key: s.value for s in settings_list}
+    
     system_prompt = settings.get("system_prompt") or "Ты полезный ассистент."
+    model_name = request.model_name or settings.get("default_model") or "gemma4:e2b"
 
     if context_text:
-        full_prompt = f"{system_prompt}\n\nКОНТЕКСТ:\n{context_text}\n\nВОПРОС ПОЛЬЗОВАТЕЛЯ:\n{request.message}"
+        full_prompt = f"Системная установка: {system_prompt}\n\nКонтекст из документа:\n{context_text}\n\nВопрос пользователя: {request.message}\n\nОтвет ассистента:"
     else:
-        full_prompt = f"{system_prompt}\n\nВОПРОС ПОЛЬЗОВАТЕЛЯ:\n{request.message}"
-
-    model_name = request.model_name or settings.get("default_model") or "llama3.1:8b"
+        full_prompt = f"Системная установка: {system_prompt}\n\nВопрос пользователя: {request.message}\n\nОтвет ассистента:"
 
     return StreamingResponse(
         ollama_stream_generator(full_prompt, model_name),
