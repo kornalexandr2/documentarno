@@ -96,7 +96,12 @@ async def get_system_state(
     current_user: User = Depends(get_current_admin_user)
 ):
     state = await redis_client.get("APP_STATE")
-    return {"state": state.decode() if state else "SEARCH"}
+    if not state:
+        return {"state": "SEARCH"}
+    
+    # If it's already a string, return it, otherwise decode
+    final_state = state if isinstance(state, str) else state.decode()
+    return {"state": final_state}
 
 
 @router.post("/state")
