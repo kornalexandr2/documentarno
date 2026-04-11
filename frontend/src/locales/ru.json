@@ -140,7 +140,8 @@
     "current": "Текущий режим:",
     "btn_change": "Переключить в {{state}}",
     "search": "ПОИСК",
-    "processing": "ОБРАБОТКУ"
+    "processing": "ОБРАБОТКУ",
+    "btn_reset_tasks": "Сбросить зависшие задачи"
   }
 }
 

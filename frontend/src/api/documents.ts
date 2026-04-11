@@ -1,4 +1,4 @@
-﻿import { API_URL, ApiError, getAuthHeaders } from './client';
+import { API_URL, ApiError, getAuthHeaders } from './client';
 import { DocumentItem } from '../types/documents';
 
 export const getDocuments = async (): Promise<DocumentItem[]> => {
@@ -42,4 +42,13 @@ export const deleteDocument = async (id: number): Promise<void> => {
     const err = await response.json().catch(() => ({}) as { detail?: string });
     throw new ApiError(response.status, err.detail || 'Failed to delete document');
   }
+};
+
+export const resetStuckDocuments = async (): Promise<{ reset_count: number }> => {
+  const response = await fetch(`${API_URL}/documents/reset-stuck`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new ApiError(response.status, 'Failed to reset stuck documents');
+  return response.json();
 };

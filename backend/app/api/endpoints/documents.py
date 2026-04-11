@@ -89,6 +89,22 @@ async def upload_document(
     return new_doc
 
 
+@router.post("/reset-stuck")
+async def reset_stuck_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    # Reset all documents that are in PROCESSING or PENDING to PENDING
+    # This is useful if the worker was restarted
+    docs = db.query(Document).filter(Document.status.in_(["PROCESSING", "PENDING"])).all()
+    for doc in docs:
+        doc.status = "PENDING"
+        ocr_heavy.apply_async(args=[doc.id], task_id=f"ocr_{doc.id}")
+    
+    db.commit()
+    return {"status": "success", "reset_count": len(docs)}
+
+
 @router.get("", response_model=List[DocumentResponse])
 async def list_documents(
     skip: int = 0,

@@ -1,8 +1,9 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { triggerLockdown, triggerUnlock, kickAllUsers, getSystemState, setSystemState } from '../api/admin';
 import { getErrorMessage } from '../api/client';
+import { resetStuckDocuments } from '../api/documents';
 import { AppSettings, getAppSettings, updateAppSettings } from '../api/settings';
 
 const Settings: React.FC = () => {
@@ -70,20 +71,31 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleAction = async (action: 'lockdown' | 'unlock' | 'kick' | 'SEARCH' | 'PROCESSING') => {
+  const handleAction = async (action: 'lockdown' | 'unlock' | 'kick' | 'SEARCH' | 'PROCESSING' | 'RESET_TASKS') => {
     try {
       setLoading(true);
       setError(null);
-      if (action === 'lockdown') await triggerLockdown();
-      else if (action === 'unlock') await triggerUnlock();
-      else if (action === 'kick') await kickAllUsers();
-      else if (action === 'SEARCH' || action === 'PROCESSING') await setSystemState(action);
       
-      // Refresh state
-      const stateData = await getSystemState();
-      setAppState(stateData.state);
+      if (action === 'lockdown') {
+        await triggerLockdown();
+      } else if (action === 'unlock') {
+        await triggerUnlock();
+      } else if (action === 'kick') {
+        await kickAllUsers();
+      } else if (action === 'SEARCH' || action === 'PROCESSING') {
+        await setSystemState(action);
+      } else if (action === 'RESET_TASKS') {
+        const res = await resetStuckDocuments();
+        setSuccessMsg(`${t('system_state.btn_reset_tasks')}: ${res.reset_count}`);
+      }
       
-      setSuccessMsg(t('settings_actions.action_success', { action }));
+      if (action !== 'RESET_TASKS') {
+        // Refresh state
+        const stateData = await getSystemState();
+        setAppState(stateData.state);
+        setSuccessMsg(t('settings_actions.action_success', { action }));
+      }
+      
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: unknown) {
       setError(getErrorMessage(err, t('settings_actions.action_error', { action })));
@@ -165,6 +177,13 @@ const Settings: React.FC = () => {
             className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded font-bold disabled:opacity-50"
           >
             {t('settings_actions.kick')}
+          </button>
+          <button
+            onClick={() => void handleAction('RESET_TASKS')}
+            disabled={loading}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded font-bold disabled:opacity-50"
+          >
+            {t('system_state.btn_reset_tasks')}
           </button>
         </div>
       </div>
