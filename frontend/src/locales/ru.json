@@ -138,7 +138,9 @@
     "state_processing": "ОБРАБОТКА (Оптимизировано для OCR)",
     "state_lockdown": "БЛОКИРОВКА (Доступ запрещен)",
     "current": "Текущий режим:",
-    "btn_change": "Переключить в {{state}}"
+    "btn_change": "Переключить в {{state}}",
+    "search": "ПОИСК",
+    "processing": "ОБРАБОТКУ"
   }
 }
 

@@ -134,14 +134,14 @@ const Settings: React.FC = () => {
             disabled={loading || appState === 'SEARCH'}
             className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded font-bold disabled:opacity-50"
           >
-            {t('system_state.btn_change', { state: 'SEARCH' })}
+            {t('system_state.btn_change', { state: t('system_state.search') })}
           </button>
           <button
             onClick={() => void handleAction('PROCESSING')}
             disabled={loading || appState === 'PROCESSING'}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-bold disabled:opacity-50"
           >
-            {t('system_state.btn_change', { state: 'PROCESSING' })}
+            {t('system_state.btn_change', { state: t('system_state.processing') })}
           </button>
           <button
             onClick={() => void handleAction('lockdown')}

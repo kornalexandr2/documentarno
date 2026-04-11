@@ -126,6 +126,17 @@
     "action_error": "Failed to execute {{action}}",
     "load_error": "Failed to load settings",
     "save_error": "Failed to save settings"
+  },
+  "system_state": {
+    "title": "System Operating Mode",
+    "description": "Current global system state. Limits available operations to save resources.",
+    "state_search": "SEARCH (Optimized for Chat)",
+    "state_processing": "PROCESSING (Optimized for OCR)",
+    "state_lockdown": "LOCKDOWN (Access Denied)",
+    "current": "Current Mode:",
+    "btn_change": "Switch to {{state}}",
+    "search": "SEARCH",
+    "processing": "PROCESSING"
   }
 }
 
