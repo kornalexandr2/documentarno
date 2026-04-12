@@ -8,9 +8,11 @@ import { getWebSocketUrl } from '../api/system';
 interface LiveMetrics {
   app_state: string;
   ocr_progress?: {
+    doc_id: number;
     filename: string;
     current_page: number;
     total_pages: number;
+    queue_size: number;
   } | null;
 }
 
@@ -26,19 +28,31 @@ const DashboardLayout: React.FC = () => {
     const wsUrl = getWebSocketUrl();
     if (!wsUrl) return;
 
-    const socket = new WebSocket(wsUrl);
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
 
-    socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as LiveMetrics;
-        setMetrics(data);
-      } catch (err) {
-        console.error('Failed to parse websocket metrics', err);
-      }
+    const connect = () => {
+      socket = new WebSocket(wsUrl);
+      
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as LiveMetrics;
+          setMetrics(data);
+        } catch (err) {
+          console.error('Failed to parse websocket metrics', err);
+        }
+      };
+
+      socket.onclose = () => {
+        reconnectTimer = window.setTimeout(connect, 3000);
+      };
     };
 
+    connect();
+
     return () => {
-      socket.close();
+      if (socket) socket.close();
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
     };
   }, [isAuthenticated]);
 
@@ -65,18 +79,24 @@ const DashboardLayout: React.FC = () => {
         
         <div className="flex items-center space-x-6">
           {ocr && (
-            <div className="hidden md:flex items-center space-x-3 bg-gray-900/50 px-3 py-1.5 rounded-full border border-blue-500/20">
-              <div className="text-[11px] text-blue-300 max-w-[150px] truncate">
-                {ocr.filename}
+            <div className="hidden md:flex items-center space-x-4 bg-gray-900/80 px-4 py-1.5 rounded-full border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+              <div className="flex flex-col">
+                <div className="text-[10px] text-blue-400 font-bold uppercase flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></span>
+                  {t('documents.status_processing')} ({ocr.queue_size})
+                </div>
+                <div className="text-[11px] text-gray-300 max-w-[180px] truncate">
+                  {ocr.filename}
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-24 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div className="flex items-center space-x-2 border-l border-gray-700 pl-4">
+                <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-blue-500 transition-all duration-500" 
+                    className="h-full bg-blue-500 transition-all duration-500 ease-out" 
                     style={{ width: `${(ocr.current_page / ocr.total_pages) * 100}%` }}
                   ></div>
                 </div>
-                <span className="text-[10px] font-mono text-gray-400">
+                <span className="text-[10px] font-mono text-blue-300">
                   {ocr.current_page}/{ocr.total_pages}
                 </span>
               </div>
@@ -91,7 +111,6 @@ const DashboardLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Mobile Progress Bar */}
       {ocr && (
         <div className="md:hidden w-full h-1 bg-gray-800">
           <div 
@@ -104,42 +123,12 @@ const DashboardLayout: React.FC = () => {
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-64 bg-gray-800 border-r border-gray-700 flex-shrink-0">
           <nav className="flex flex-col gap-2 p-4">
-            <Link
-              to="/"
-              className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname === '/' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
-            >
-              {t('layout.nav_dashboard')}
-            </Link>
-            <Link
-              to="/chat"
-              className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname.startsWith('/chat') ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
-            >
-              {t('layout.nav_chat')}
-            </Link>
-            <Link
-              to="/documents"
-              className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname.startsWith('/documents') ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
-            >
-              {t('layout.nav_documents')}
-            </Link>
-            <Link
-              to="/models"
-              className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname.startsWith('/models') ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
-            >
-              {t('layout.nav_models')}
-            </Link>
-            <Link
-              to="/hardware"
-              className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname.startsWith('/hardware') ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
-            >
-              {t('layout.nav_hardware')}
-            </Link>
-            <Link
-              to="/settings"
-              className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname.startsWith('/settings') ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
-            >
-              {t('layout.nav_settings')}
-            </Link>
+            <Link to="/" className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname === '/' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}>{t('layout.nav_dashboard')}</Link>
+            <Link to="/chat" className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname.startsWith('/chat') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}>{t('layout.nav_chat')}</Link>
+            <Link to="/documents" className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname.startsWith('/documents') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}>{t('layout.nav_documents')}</Link>
+            <Link to="/models" className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname.startsWith('/models') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}>{t('layout.nav_models')}</Link>
+            <Link to="/hardware" className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname.startsWith('/hardware') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}>{t('layout.nav_hardware')}</Link>
+            <Link to="/settings" className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.pathname.startsWith('/settings') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}>{t('layout.nav_settings')}</Link>
           </nav>
         </aside>
 

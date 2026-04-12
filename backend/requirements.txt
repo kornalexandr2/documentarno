@@ -15,7 +15,7 @@ httpx==0.25.2
 aiofiles==23.2.1
 numpy==1.24.4
 pillow==10.1.0
-paddlepaddle-gpu==2.5.2; sys_platform == 'linux'
+paddlepaddle-gpu==2.5.2.post118; sys_platform == 'linux'
 paddlepaddle==2.5.2; sys_platform == 'win32'
 paddleocr==2.7.0.3
 PyMuPDF==1.20.2

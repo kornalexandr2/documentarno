@@ -6,14 +6,13 @@ import torch
 from paddleocr import PPStructure
 from markdownify import markdownify as md
 from docx import Document as DocxDocument
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
 # Initialize PaddleOCR globally
 try:
     use_gpu = torch.cuda.is_available()
-    # For PPStructure, 'lang' is for layout analysis (supports 'en', 'ch')
-    # We use 'en' for layout but it will still detect Russian text via internal OCR
     ocr_engine = PPStructure(
         lang='en', 
         show_log=False,
@@ -27,7 +26,7 @@ except Exception as e:
     logger.error(f"Failed to initialize PaddleOCR engine: {e}")
     ocr_engine = None
 
-def process_pdf_to_markdown(file_path: str) -> str:
+def process_pdf_to_markdown(file_path: str, progress_callback: Optional[Callable[[int, int], None]] = None) -> str:
     """
     Extracts text and tables from a PDF using PaddleOCR PPStructure.
     """
@@ -42,6 +41,9 @@ def process_pdf_to_markdown(file_path: str) -> str:
         total_pages = len(doc)
 
         for page_num in range(total_pages):
+            if progress_callback:
+                progress_callback(page_num + 1, total_pages)
+            
             logger.info(f"--- [OCR PROGRESS] Processing page {page_num + 1}/{total_pages} ---")
             page = doc.load_page(page_num)
             pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
@@ -52,7 +54,6 @@ def process_pdf_to_markdown(file_path: str) -> str:
                 f.write(img_bytes)
 
             try:
-                # We can't specify ocr_lang here easily, but Paddle handles RU well with lang='en'
                 result = ocr_engine(temp_img_path)
                 markdown_content.append(f"\n## Страница {page_num + 1}\n")
 
@@ -92,7 +93,6 @@ def process_docx_to_markdown(file_path: str) -> str:
         doc = DocxDocument(file_path)
         markdown_content = []
         
-        # Process paragraphs
         for para in doc.paragraphs:
             if para.text.strip():
                 if para.style.name.startswith('Heading 1'):
@@ -104,13 +104,11 @@ def process_docx_to_markdown(file_path: str) -> str:
                 else:
                     markdown_content.append(para.text)
         
-        # Process tables
         for table in doc.tables:
             markdown_content.append("\n")
             if len(table.rows) > 0:
                 header_row = table.rows[0]
                 cols_count = len(header_row.cells)
-                
                 for i, row in enumerate(table.rows):
                     cells = [cell.text.replace("\n", " ").strip() for cell in row.cells]
                     markdown_content.append("| " + " | ".join(cells) + " |")
