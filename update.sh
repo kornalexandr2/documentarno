@@ -5,21 +5,13 @@ echo "======================================"
 echo " Documentarno Update Script"
 echo "======================================"
 
-# Detect docker compose command (v1 or v2)
-COMPOSE_CMD=""
-if command -v docker &> /dev/null && docker compose version &> /dev/null; then
-    COMPOSE_CMD="docker compose"
-    echo "[+] Using 'docker compose' (v2)"
-elif command -v docker-compose &> /dev/null; then
+# Detect docker compose command
+COMPOSE_CMD="docker compose"
+if ! command -v docker compose &> /dev/null; then
     COMPOSE_CMD="docker-compose"
-    echo "[+] Using 'docker-compose' (v1)"
-else
-    echo "[!] Docker Compose is not installed."
-    exit 1
 fi
 
 echo "[-] Pulling latest changes from git..."
-# Hard reset to origin/main to ensure clean state as requested
 git fetch --all
 git reset --hard origin/main
 git clean -fd
@@ -27,11 +19,11 @@ git clean -fd
 echo "[-] Building new Docker images..."
 $COMPOSE_CMD build
 
-echo "[-] Starting database services for migrations..."
-$COMPOSE_CMD up -d postgres redis qdrant
+echo "[-] Starting services..."
+$COMPOSE_CMD up -d
 
 echo "[-] Waiting for PostgreSQL to be healthy..."
-for i in $(seq 1 60); do
+for i in $(seq 1 30); do
     if $COMPOSE_CMD ps postgres | grep -q "healthy"; then
         echo "[+] PostgreSQL is healthy."
         break
@@ -40,13 +32,12 @@ for i in $(seq 1 60); do
 done
 
 echo "[-] Applying database migrations..."
-$COMPOSE_CMD up -d backend
-sleep 10
-$COMPOSE_CMD exec -T backend alembic upgrade head || echo "[WARNING] No migrations found or Alembic not configured yet."
+$COMPOSE_CMD exec -T backend alembic upgrade head || echo "[WARNING] No migrations found."
 
-echo "[-] Restarting all services..."
-$COMPOSE_CMD up -d
+echo "[-] Finalizing services and clearing Nginx cache..."
+# Crucial: restart nginx to re-resolve backend IP and apply configs
+$COMPOSE_CMD restart nginx backend celery_worker
 
 echo "======================================"
-echo " Update Complete!"
+echo " Update Complete! Website should be ready."
 echo "======================================"
