@@ -1,11 +1,11 @@
 # Use official NVIDIA CUDA image with CuDNN for GPU support
 FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 
-# Install Python and Docker CLI
+# Install Python 3.11 and Docker CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 \
+    python3.11 \
+    python3.11-dev \
     python3-pip \
-    python3-dev \
     gcc \
     libpq-dev \
     curl \
@@ -17,15 +17,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set python3 as default python
-RUN ln -s /usr/bin/python3.10 /usr/bin/python
+# Set python3.11 as default python
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && update-alternatives --set python3 /usr/bin/python3.11 \
+    && ln -s /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
 
 # Install dependencies
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
+RUN python3 -m pip install --no-cache-dir --upgrade pip \
+    && python3 -m pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
 
 # Copy application code
 COPY . /app/
