@@ -1,14 +1,16 @@
 #!/bin/bash
 set -e
 
-# 1. Run migrations
-echo "Running database migrations..."
+# Wait for a bit to ensure DB is ready
+sleep 5
+
+echo "--- Starting Prestart Script ---"
+
+echo "1. Running migrations..."
 python3 -m alembic upgrade head
 
-# 2. Initial data
-echo "Initializing database data..."
+echo "2. Initializing data..."
 python3 -m app.initial_data
 
-# 3. Start the application (exec the command passed from docker-compose)
-echo "Starting application..."
+echo "3. Execution complete. Starting application..."
 exec "$@"
