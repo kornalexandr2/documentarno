@@ -1,6 +1,19 @@
 ﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import logging
+
+# Configure Logging to file and console
+log_file = "/app/app.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 from app.api.api import api_router
 from app.api.endpoints.system import ws_router as system_ws_router

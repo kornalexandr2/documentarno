@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import uuid
 from pathlib import Path
 from typing import List
 
@@ -9,7 +10,6 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin_user, get_current_user
-from app.core.redis import redis_client
 from app.db.models import Document, User
 from app.db.session import get_db
 from app.schemas.document import DocumentResponse
@@ -21,29 +21,10 @@ DOC_SOURCE_PATH = os.getenv("DOC_SOURCE_PATH", "/app/doc_source")
 ALLOWED_PRIORITIES = {"HIGH", "NORMAL", "LOW"}
 
 
-def sanitize_uploaded_filename(filename: str) -> str:
-    if not filename:
-        raise HTTPException(status_code=400, detail="Filename is required")
-
-    # Extract only the base name if a path was sent
-    safe_name = os.path.basename(filename).strip()
-    
-    if not safe_name:
-        raise HTTPException(status_code=400, detail="Invalid filename")
-
-    allowed_extensions = {".pdf", ".docx"}
-    file_ext = os.path.splitext(safe_name.lower())[1]
-    if file_ext not in allowed_extensions:
-        raise HTTPException(status_code=400, detail="Only PDF and DOCX files are allowed")
-
-    return safe_name
-
-
-def resolve_document_path(filename: str) -> Path:
-    # Ensure no path traversal
-    safe_name = os.path.basename(filename)
+def resolve_document_path(source_path: str) -> Path:
     source_dir = Path(DOC_SOURCE_PATH).resolve()
-    return source_dir / safe_name
+    # source_path here is the safe internal filename (UUID based)
+    return source_dir / source_path
 
 
 @router.post("/upload", response_model=DocumentResponse)
@@ -53,21 +34,17 @@ async def upload_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
-    safe_filename = sanitize_uploaded_filename(file.filename or "")
-    normalized_priority = priority.upper()
-    if normalized_priority not in ALLOWED_PRIORITIES:
-        raise HTTPException(status_code=400, detail="Invalid priority")
+    original_filename = file.filename or "unnamed_document"
+    extension = os.path.splitext(original_filename.lower())[1]
+    
+    if extension not in {".pdf", ".docx"}:
+        raise HTTPException(status_code=400, detail="Only PDF and DOCX files are allowed")
 
+    # Create safe internal filename using UUID to avoid ANY issues with cyrillic/long names
+    internal_filename = f"{uuid.uuid4()}{extension}"
+    
     os.makedirs(DOC_SOURCE_PATH, exist_ok=True)
-    file_path = resolve_document_path(safe_filename)
-
-    if file_path.exists():
-        # Add a timestamp to prevent collision instead of failing
-        from datetime import datetime
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        name, ext = os.path.splitext(safe_filename)
-        safe_filename = f"{name}_{timestamp}{ext}"
-        file_path = resolve_document_path(safe_filename)
+    file_path = resolve_document_path(internal_filename)
 
     try:
         with open(file_path, "wb") as buffer:
@@ -76,9 +53,10 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Could not save file: {e}") from e
 
     new_doc = Document(
-        source_path=safe_filename,
+        filename=original_filename,
+        source_path=internal_filename,
         status="PENDING",
-        priority=normalized_priority
+        priority=priority.upper() if priority.upper() in ALLOWED_PRIORITIES else "NORMAL"
     )
     db.add(new_doc)
     db.commit()
@@ -94,11 +72,10 @@ async def reset_stuck_documents(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
-    # Reset all documents that are in PROCESSING or PENDING to PENDING
-    # This is useful if the worker was restarted
-    docs = db.query(Document).filter(Document.status.in_(["PROCESSING", "PENDING"])).all()
+    docs = db.query(Document).filter(Document.status.in_(["PROCESSING", "PENDING", "ERROR"])).all()
     for doc in docs:
         doc.status = "PENDING"
+        doc.error_message = None
         ocr_heavy.apply_async(args=[doc.id], task_id=f"ocr_{doc.id}")
     
     db.commit()
@@ -134,7 +111,7 @@ async def download_document(
     if doc.source_path.lower().endswith(".docx"):
         media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-    return FileResponse(file_path, media_type=media_type, filename=doc.source_path)
+    return FileResponse(file_path, media_type=media_type, filename=doc.filename)
 
 
 @router.delete("/{doc_id}")

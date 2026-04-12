@@ -16,9 +16,11 @@ class User(Base):
 class Document(Base):
     __tablename__ = 'documents'
     id = Column(Integer, primary_key=True, index=True)
-    source_path = Column(String, nullable=False)
+    filename = Column(String, nullable=False) # Original name
+    source_path = Column(String, nullable=False) # Path on disk
     status = Column(String, nullable=False)
     priority = Column(String, default='NORMAL')
+    error_message = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class ChatHistory(Base):

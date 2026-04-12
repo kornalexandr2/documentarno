@@ -206,9 +206,14 @@ def ocr_heavy(self, doc_id: int):
         logger.info(f"Successfully processed document ID: {doc_id}")
 
     except Exception as e:
-        logger.error(f"OCR Task failed for document ID {doc_id}: {str(e)}")
+        error_msg = str(e)
+        logger.error(f"OCR Task failed for document ID {doc_id}: {error_msg}")
+        
+        # Save error message to DB
         doc.status = "ERROR"
+        doc.error_message = error_msg
         db.commit()
+        
         raise self.retry(exc=e, countdown=60)  # Retry after 60 seconds
     finally:
         db.close()

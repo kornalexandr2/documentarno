@@ -44,3 +44,16 @@ export const setSystemState = async (state: string): Promise<{ status: string }>
   }
   return response.json();
 };
+
+export const getSystemLogs = async (lines = 100, level?: string): Promise<{ logs: string }> => {
+  let url = `${API_URL}/system/metrics/logs?lines=${lines}`;
+  if (level) url += `&level=${level}`;
+  
+  const response = await fetch(url, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, 'Failed to get system logs');
+  }
+  return response.json();
+};

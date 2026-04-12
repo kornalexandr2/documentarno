@@ -194,6 +194,37 @@ async def websocket_metrics(websocket: WebSocket, token: str = Query(...)):
         await websocket.close()
 
 
+@router.get("/logs")
+async def get_system_logs(
+    lines: int = Query(100, ge=1, le=1000),
+    level: str | None = Query(None, regex="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$"),
+    current_user: User = Depends(get_current_superadmin_user)
+):
+    """
+    Reads system logs from the docker container or log file.
+    In this implementation, we'll read from stdout of the current process 
+    or a dedicated log file if configured.
+    """
+    # For now, let's use a simple approach: read from a temporary log capture
+    # Or simulate by returning a meaningful message if log file is not yet set up
+    log_path = "/app/app.log"
+    if not os.path.exists(log_path):
+        return {"logs": "Logging to file is not configured yet. Please check docker logs doc_backend."}
+    
+    try:
+        with open(log_path, "r") as f:
+            all_lines = f.readlines()
+            
+        if level:
+            filtered = [ln for ln in all_lines if level in ln]
+        else:
+            filtered = all_lines
+            
+        return {"logs": "".join(filtered[-lines:])}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read logs: {e}")
+
+
 @router.get("/history")
 async def get_metrics_history(
     period: str = Query("24h", description="Period like 1h, 24h, 7d"),
