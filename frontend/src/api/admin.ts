@@ -45,11 +45,8 @@ export const setSystemState = async (state: string): Promise<{ status: string }>
   return response.json();
 };
 
-export const getSystemLogs = async (lines = 100, level?: string): Promise<{ logs: string }> => {
-  let url = `${API_URL}/system/metrics/logs?lines=${lines}`;
-  if (level) url += `&level=${level}`;
-  
-  const response = await fetch(url, {
+export const getSystemLogs = async (lines = 100, container = 'doc_backend'): Promise<{ logs: string }> => {
+  const response = await fetch(`${API_URL}/system/metrics/logs?lines=${lines}&container=${container}`, {
     headers: getAuthHeaders(),
   });
   if (!response.ok) {

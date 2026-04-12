@@ -157,9 +157,16 @@ const Documents: React.FC = () => {
                       <td className="py-3 px-4 text-gray-400">#{doc.id}</td>
                       <td className="py-3 px-4 font-medium">{doc.source_path}</td>
                       <td className="py-3 px-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(doc.status)}`}>
-                          {t('documents.status_' + doc.status.toLowerCase(), doc.status)}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold border w-fit ${getStatusColor(doc.status)}`}>
+                            {t('documents.status_' + doc.status.toLowerCase(), doc.status)}
+                          </span>
+                          {doc.status === 'ERROR' && doc.error_message && (
+                            <span className="text-[10px] text-red-400 mt-1 max-w-[200px] break-words" title={doc.error_message}>
+                              {doc.error_message}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className={`py-3 px-4 font-semibold text-sm ${getPriorityColor(doc.priority)}`}>
                         {t('documents.prio_' + doc.priority.toLowerCase(), doc.priority)}

@@ -26,7 +26,7 @@ const Settings: React.FC = () => {
   // Logs state
   const [logs, setLogs] = useState<string>('');
   const [logLines, setLogLines] = useState(100);
-  const [logLevel, setLogLevel] = useState<string>('');
+  const [logContainer, setLogContainer] = useState('doc_backend');
   const [logViewMode, setLogViewMode] = useState<'pretty' | 'raw'>('pretty');
   const [loadingLogs, setLoadingLogs] = useState(false);
 
@@ -55,7 +55,7 @@ const Settings: React.FC = () => {
   const fetchLogs = async () => {
     setLoadingLogs(true);
     try {
-      const data = await getSystemLogs(logLines, logLevel || undefined);
+      const data = await getSystemLogs(logLines, logContainer);
       setLogs(data.logs);
     } catch (err: unknown) {
       console.error(err);
@@ -134,12 +134,6 @@ const Settings: React.FC = () => {
     }
   };
 
-  const parseLogLine = (line: string) => {
-    const parts = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) \[(\w+)\] (.*)$/);
-    if (!parts) return { time: '', level: 'INFO', message: line };
-    return { time: parts[1], level: parts[2], message: parts[3] };
-  };
-
   return (
     <div className="p-6 text-white h-full flex flex-col max-w-5xl mx-auto overflow-y-auto">
       <h1 className="text-3xl font-bold mb-6">{t('settings.title', 'System Settings')}</h1>
@@ -201,7 +195,6 @@ const Settings: React.FC = () => {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6 mb-10">
-        {/* Prompt Section */}
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <h2 className="text-xl mb-2 font-semibold">{t('settings.prompt_title')}</h2>
           <textarea
@@ -214,7 +207,6 @@ const Settings: React.FC = () => {
           />
         </div>
 
-        {/* Model Section */}
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <h2 className="text-xl mb-4 font-semibold">{t('settings.default_model')}</h2>
           <select
@@ -231,7 +223,6 @@ const Settings: React.FC = () => {
           </select>
         </div>
 
-        {/* Telegram Section */}
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <h2 className="text-xl mb-4 font-semibold">{t('settings_actions.telegram_title')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -268,15 +259,14 @@ const Settings: React.FC = () => {
           
           <div className="flex items-center gap-3">
             <select 
-              value={logLevel} 
-              onChange={(e) => setLogLevel(e.target.value)}
+              value={logContainer} 
+              onChange={(e) => setLogContainer(e.target.value)}
               className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs"
             >
-              <option value="">All Levels</option>
-              <option value="INFO">INFO</option>
-              <option value="WARNING">WARNING</option>
-              <option value="ERROR">ERROR</option>
-              <option value="DEBUG">DEBUG</option>
+              <option value="doc_backend">Backend</option>
+              <option value="doc_celery_worker">Worker (OCR)</option>
+              <option value="doc_ollama">Ollama (LLM)</option>
+              <option value="doc_nginx">Nginx (Gateway)</option>
             </select>
             
             <input 
@@ -311,27 +301,24 @@ const Settings: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-4 h-[400px] overflow-auto bg-black/50 font-mono text-xs">
+        <div className="p-4 h-[500px] overflow-auto bg-black/50 font-mono text-xs leading-relaxed">
           {loadingLogs ? (
             <div className="text-center py-20">{t('common.loading')}</div>
           ) : !logs ? (
             <div className="text-center py-20 text-gray-500">{t('system_state.logs_empty')}</div>
           ) : logViewMode === 'raw' ? (
-            <textarea 
-              readOnly 
-              value={logs} 
-              className="w-full h-full bg-transparent border-0 outline-none resize-none text-gray-300"
-            />
+            <pre className="whitespace-pre-wrap text-gray-300">{logs}</pre>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {logs.split('\n').filter(l => l.trim()).map((line, i) => {
-                const { time, level, message } = parseLogLine(line);
-                const levelColor = level === 'ERROR' ? 'text-red-500' : level === 'WARNING' ? 'text-yellow-500' : 'text-blue-400';
+                const isError = line.toLowerCase().includes('error') || line.toLowerCase().includes('fail');
+                const isWarn = line.toLowerCase().includes('warn');
+                const isSuccess = line.toLowerCase().includes('success') || line.toLowerCase().includes('completed');
+                const colorClass = isError ? 'text-red-400' : isWarn ? 'text-yellow-400' : isSuccess ? 'text-green-400' : 'text-gray-300';
                 return (
-                  <div key={i} className="flex gap-3 border-b border-gray-800/30 pb-1">
-                    <span className="text-gray-600 shrink-0">{time}</span>
-                    <span className={`font-bold shrink-0 w-12 ${levelColor}`}>[{level}]</span>
-                    <span className="text-gray-300 break-all">{message}</span>
+                  <div key={i} className={`pb-0.5 border-b border-gray-800/20 ${colorClass}`}>
+                    <span className="opacity-50 mr-2">[{i+1}]</span>
+                    {line}
                   </div>
                 );
               })}

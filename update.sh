@@ -18,19 +18,11 @@ else
     exit 1
 fi
 
-# 1. Stash any local changes to avoid git conflicts
-echo "[-] Stashing local changes..."
-git stash --include-untracked 2>/dev/null || true
-
 echo "[-] Pulling latest changes from git..."
-git pull || {
-    echo "[ERROR] Git pull failed. Resolve conflicts and try again."
-    git stash pop 2>/dev/null || true
-    exit 1
-}
-
-# Restore stashed changes
-git stash pop 2>/dev/null || true
+# Hard reset to origin/main to ensure clean state as requested
+git fetch --all
+git reset --hard origin/main
+git clean -fd
 
 echo "[-] Building new Docker images..."
 $COMPOSE_CMD build
@@ -44,16 +36,11 @@ for i in $(seq 1 60); do
         echo "[+] PostgreSQL is healthy."
         break
     fi
-    if [ $i -eq 60 ]; then
-        echo "[ERROR] PostgreSQL did not become healthy in 60 seconds."
-        exit 1
-    fi
     sleep 2
 done
 
 echo "[-] Applying database migrations..."
 $COMPOSE_CMD up -d backend
-# Wait for backend to be ready for migrations
 sleep 10
 $COMPOSE_CMD exec -T backend alembic upgrade head || echo "[WARNING] No migrations found or Alembic not configured yet."
 
