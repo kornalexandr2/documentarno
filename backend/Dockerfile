@@ -31,8 +31,8 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip \
 # Copy application code
 COPY . /app/
 
-# Ensure prestart is executable
+# Ensure prestart is executable and has Linux line endings
 RUN chmod +x prestart.sh
 
-# The command is overridden in docker-compose.yml
-CMD ["./prestart.sh"]
+# Explicitly set entrypoint to our script to override NVIDIA's default entrypoint
+ENTRYPOINT ["/bin/bash", "-c", "./prestart.sh"]
