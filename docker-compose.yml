@@ -54,6 +54,7 @@ services:
       dockerfile: Dockerfile
     container_name: doc_backend
     restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       postgres:
         condition: service_healthy
@@ -120,7 +121,7 @@ services:
       dockerfile: Dockerfile
     container_name: doc_telegram_bot
     restart: unless-stopped
-    command: python -m app.worker.bot
+    command: python3 -m app.worker.bot
     depends_on:
       redis:
         condition: service_healthy
@@ -135,7 +136,7 @@ services:
       dockerfile: Dockerfile
     container_name: doc_fs_watchdog
     restart: unless-stopped
-    command: python -m app.worker.fs_watchdog
+    command: python3 -m app.worker.fs_watchdog
     depends_on:
       redis:
         condition: service_healthy
@@ -167,4 +168,3 @@ services:
         condition: service_started
       backend:
         condition: service_healthy
-

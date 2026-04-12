@@ -1,28 +1,14 @@
-﻿#!/bin/bash
-
+#!/bin/bash
 set -e
 
-
-
-# Run migrations
-
+# 1. Run migrations
 echo "Running database migrations..."
+python3 -m alembic upgrade head
 
-alembic upgrade head
-
-
-
-# Initialize initial data
-
+# 2. Initial data
 echo "Initializing database data..."
+python3 -m app.initial_data
 
-python -m app.initial_data
-
-
-
-# Initialize Qdrant Collection
-
-echo "Initializing Qdrant Collection..."
-
-python -m app.core.qdrant
-
+# 3. Start the application (exec the command passed from docker-compose)
+echo "Starting application..."
+exec "$@"

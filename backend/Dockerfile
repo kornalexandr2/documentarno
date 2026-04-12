@@ -31,8 +31,8 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip \
 # Copy application code
 COPY . /app/
 
-# Ensure prestart is executable and has Linux line endings
-RUN chmod +x prestart.sh
+# Ensure prestart is executable and has Linux line endings (crucial for Windows-to-Linux dev)
+RUN sed -i 's/\r$//' prestart.sh && chmod +x prestart.sh
 
-# Explicitly set entrypoint to our script to override NVIDIA's default entrypoint
-ENTRYPOINT ["/bin/bash", "-c", "./prestart.sh"]
+# Entrypoint runs the script, which then executes whatever CMD is passed
+ENTRYPOINT ["/app/prestart.sh"]
