@@ -1,11 +1,22 @@
 import os
 import psutil
+import redis
+import json
+
 try:
     import pynvml
     pynvml.nvmlInit()
     NVML_AVAILABLE = True
 except Exception:
     NVML_AVAILABLE = False
+
+# Sync redis client for metrics gathering
+redis_sync = redis.Redis(
+    host=os.getenv("REDIS_HOST", "redis"),
+    port=int(os.getenv("REDIS_PORT", "6379")),
+    db=0,
+    decode_responses=True
+)
 
 def get_live_metrics():
     # CPU
@@ -15,6 +26,14 @@ def get_live_metrics():
     ram = psutil.virtual_memory()
     ram_usage = ram.percent
     
+    # State and Progress from Redis
+    app_state = redis_sync.get("APP_STATE") or "SEARCH"
+    ocr_progress = redis_sync.get("OCR_PROGRESS")
+    try:
+        ocr_data = json.loads(ocr_progress) if ocr_progress else None
+    except Exception:
+        ocr_data = None
+
     # Disks - platform-agnostic root
     root_path = os.path.abspath(os.sep)
     sys_disk = psutil.disk_usage(root_path)
@@ -47,6 +66,8 @@ def get_live_metrics():
             pass
             
     return {
+        "app_state": app_state,
+        "ocr_progress": ocr_data,
         "cpu_usage_percent": cpu_usage,
         "ram_usage_percent": ram_usage,
         "gpu_utilization_percent": gpu_util,

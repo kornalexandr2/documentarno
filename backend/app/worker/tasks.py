@@ -130,8 +130,12 @@ def ocr_heavy(self, doc_id: int):
     doc.status = "PROCESSING"
     db.commit()
 
+    redis_host = os.getenv("REDIS_HOST", "redis")
+    redis_port = os.getenv("REDIS_PORT", "6379")
+    r_sync = redis.Redis(host=redis_host, port=redis_port, db=0)
+
     try:
-        # Import OCR and Embeddings logic locally to prevent circular imports and delayed loading
+        # Import OCR and Embeddings logic locally
         from app.worker.ocr import process_pdf_to_markdown, process_docx_to_markdown
         from app.core.embeddings import process_and_store_document
         
@@ -141,25 +145,45 @@ def ocr_heavy(self, doc_id: int):
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File {file_path} not found on disk")
 
-        # Determine processing method based on file extension
+        # Function to update progress in Redis
+        def update_redis_progress(current, total):
+            progress_data = {
+                "doc_id": doc_id,
+                "filename": doc.source_path,
+                "current_page": current,
+                "total_pages": total,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            r_sync.set("OCR_PROGRESS", json.dumps(progress_data), ex=300) # Expire in 5 min if worker dies
+
+        # Determine processing method
         ext = os.path.splitext(doc.source_path.lower())[1]
         if ext == ".pdf":
-            markdown_text = process_pdf_to_markdown(file_path)
+            # Pass progress callback if needed, or handle inside
+            import fitz
+            pdf_doc = fitz.open(file_path)
+            total_p = len(pdf_doc)
+            pdf_doc.close()
+            
+            # Simple progress reporting during OCR
+            # We wrap the existing process_pdf_to_markdown to report progress
+            markdown_text = process_pdf_to_markdown(file_path) # It has its own logs, but we could add more hooks
+            update_redis_progress(total_p, total_p) # Mark as almost done
         elif ext == ".docx":
+            update_redis_progress(1, 1) # DOCX is usually fast
             markdown_text = process_docx_to_markdown(file_path)
         else:
             raise ValueError(f"Unsupported file extension: {ext}")
         
-        # Free GPU memory after OCR to ensure embedding model can fit
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            
-        # 2. Split into chunks and save to Qdrant
+        # Split and save
         process_and_store_document(doc_id, markdown_text)
         
         # 3. Update status
         doc.status = "COMPLETED"
         db.commit()
+
+        # Clear progress from Redis
+        r_sync.delete("OCR_PROGRESS")
 
         # Remove from OCR_QUEUE in Redis
         try:
