@@ -13,7 +13,12 @@ interface LiveMetrics {
     filename: string;
     current_page: number;
     total_pages: number;
-    queue_size: number;
+    current_document_percent: number;
+    current_document_index: number;
+    completed_docs: number;
+    total_docs: number;
+    remaining_docs: number;
+    overall_percent: number;
   } | null;
 }
 
@@ -67,6 +72,8 @@ const DashboardLayout: React.FC = () => {
 
   const appState = metrics?.app_state || 'SEARCH';
   const ocr = metrics?.ocr_progress;
+  const currentDocPercent = ocr?.current_document_percent ?? 0;
+  const overallPercent = ocr?.overall_percent ?? 0;
 
   return (
     <div className="min-h-screen bg-gray-900 w-full flex flex-col">
@@ -84,26 +91,37 @@ const DashboardLayout: React.FC = () => {
         
         <div className="flex items-center space-x-6">
           {ocr && (
-            <div className="hidden md:flex items-center space-x-4 bg-gray-900/80 px-4 py-1.5 rounded-full border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
-              <div className="flex flex-col">
+            <div className="hidden md:flex items-center gap-4 bg-gray-900/80 px-4 py-2 rounded-xl border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+              <div className="flex flex-col min-w-[190px]">
                 <div className="text-[10px] text-blue-400 font-bold uppercase flex items-center gap-2">
                   <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></span>
-                  {t('documents.status_processing')} ({ocr.queue_size})
+                  {t('documents.status_processing')}
                 </div>
-                <div className="text-[11px] text-gray-300 max-w-[180px] truncate">
+                <div className="text-[11px] text-gray-300 max-w-[220px] truncate">
                   {ocr.filename}
                 </div>
               </div>
-              <div className="flex items-center space-x-2 border-l border-gray-700 pl-4">
-                <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-blue-500 transition-all duration-500 ease-out" 
-                    style={{ width: `${(ocr.current_page / ocr.total_pages) * 100}%` }}
-                  ></div>
+              <div className="flex flex-col gap-1 border-l border-gray-700 pl-4 min-w-[220px]">
+                <div className="flex items-center justify-between text-[10px] text-gray-300">
+                  <span>{`Очередь: ${ocr.completed_docs}/${ocr.total_docs}`}</span>
+                  <span>{`${overallPercent.toFixed(1)}%`}</span>
                 </div>
-                <span className="text-[10px] font-mono text-blue-300">
-                  {ocr.current_page}/{ocr.total_pages}
-                </span>
+                <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-500 ease-out"
+                    style={{ width: `${overallPercent}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-gray-300">
+                  <span>{`Документ: ${ocr.current_document_index}/${ocr.total_docs}`}</span>
+                  <span>{`${ocr.current_page}/${ocr.total_pages} стр.`}</span>
+                </div>
+                <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 transition-all duration-500 ease-out"
+                    style={{ width: `${currentDocPercent}%` }}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -117,11 +135,34 @@ const DashboardLayout: React.FC = () => {
       </header>
 
       {ocr && (
-        <div className="md:hidden w-full h-1 bg-gray-800">
-          <div 
-            className="h-full bg-blue-500 transition-all duration-500" 
-            style={{ width: `${(ocr.current_page / ocr.total_pages) * 100}%` }}
-          ></div>
+        <div className="md:hidden w-full bg-gray-800 border-b border-gray-700 px-4 py-2 space-y-2">
+          <div className="flex items-center justify-between text-[10px] uppercase text-blue-400 font-bold">
+            <span>{t('documents.status_processing')}</span>
+            <span>{`Очередь ${ocr.completed_docs}/${ocr.total_docs}`}</span>
+          </div>
+          <div className="text-[11px] text-gray-300 truncate">{ocr.filename}</div>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[10px] text-gray-300">
+              <span>{`Всего: ${overallPercent.toFixed(1)}%`}</span>
+              <span>{`Осталось файлов: ${ocr.remaining_docs}`}</span>
+            </div>
+            <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 transition-all duration-500"
+                style={{ width: `${overallPercent}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-gray-300">
+              <span>{`Текущий документ: ${currentDocPercent.toFixed(1)}%`}</span>
+              <span>{`${ocr.current_page}/${ocr.total_pages} стр.`}</span>
+            </div>
+            <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-500 transition-all duration-500"
+                style={{ width: `${currentDocPercent}%` }}
+              />
+            </div>
+          </div>
         </div>
       )}
 

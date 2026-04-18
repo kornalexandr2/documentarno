@@ -21,6 +21,11 @@ ws_router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _is_expected_websocket_disconnect(exc: Exception) -> bool:
+    message = str(exc)
+    return any(code in message for code in ("1000", "1001", "1005"))
+
+
 def _resolve_period(period: str) -> timedelta:
     periods = {
         "1h": timedelta(hours=1),
@@ -157,6 +162,10 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         logger.info("Metrics WebSocket disconnected")
     except Exception as exc:
+        if _is_expected_websocket_disconnect(exc):
+            logger.info("Metrics WebSocket closed by client: %s", exc)
+            return
+
         logger.error("WebSocket error: %s", exc)
         try:
             await websocket.close(code=status.WS_1011_INTERNAL_ERROR)

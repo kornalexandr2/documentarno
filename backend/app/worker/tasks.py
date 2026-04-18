@@ -13,6 +13,40 @@ from app.core.events import emit_event_sync
 
 logger = logging.getLogger(__name__)
 
+
+def build_ocr_progress_payload(db: Session, redis_conn: redis.Redis, doc_id: int, filename: str, current: int, total: int) -> dict:
+    pending_count = db.query(Document).filter(Document.status.in_(["PENDING", "PROCESSING"])).count()
+
+    existing_raw = redis_conn.get("OCR_PROGRESS")
+    existing_progress = {}
+    if existing_raw:
+        try:
+            existing_progress = json.loads(existing_raw)
+        except json.JSONDecodeError:
+            existing_progress = {}
+
+    previous_total_docs = int(existing_progress.get("total_docs", 0) or 0)
+    previous_completed_docs = int(existing_progress.get("completed_docs", 0) or 0)
+
+    total_docs = max(previous_total_docs, pending_count + previous_completed_docs, 1)
+    completed_docs = max(total_docs - pending_count, 0)
+    current_doc_progress_percent = round((current / total) * 100, 1) if total > 0 else 0.0
+    overall_percent = round(((completed_docs + (current_doc_progress_percent / 100.0)) / total_docs) * 100, 1)
+
+    return {
+        "doc_id": doc_id,
+        "filename": filename,
+        "current_page": current,
+        "total_pages": total,
+        "current_document_percent": current_doc_progress_percent,
+        "current_document_index": min(completed_docs + 1, total_docs),
+        "completed_docs": completed_docs,
+        "total_docs": total_docs,
+        "remaining_docs": pending_count,
+        "overall_percent": overall_percent,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+
 def check_and_emit_alert(redis_conn: redis.Redis, alert_type: str, alert_key: str, message: str, db: Session):
     cooldown_key = f"ALERT_COOLDOWN:{alert_key}"
     if not redis_conn.exists(cooldown_key):
@@ -89,16 +123,7 @@ def ocr_heavy(self, doc_id: int):
         file_path = os.path.join(doc_source_path, doc.source_path)
         
         def update_redis_progress(current, total):
-            # Count pending docs
-            pending_count = db.query(Document).filter(Document.status.in_(["PENDING", "PROCESSING"])).count()
-            progress_data = {
-                "doc_id": doc_id,
-                "filename": doc.filename,
-                "current_page": current,
-                "total_pages": total,
-                "queue_size": pending_count,
-                "updated_at": datetime.utcnow().isoformat()
-            }
+            progress_data = build_ocr_progress_payload(db, r_sync, doc_id, doc.filename, current, total)
             r_sync.set("OCR_PROGRESS", json.dumps(progress_data), ex=300)
 
         ext = os.path.splitext(doc.source_path.lower())[1]
