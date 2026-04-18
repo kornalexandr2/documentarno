@@ -36,7 +36,7 @@ app.add_middleware(
 app.add_middleware(SecurityMiddleware)
 
 app.include_router(api_router, prefix="/api")
-app.include_router(system_ws_router, prefix="/ws/system/metrics", tags=["system_ws"])
+app.include_router(system_ws_router, prefix="/ws/system/metrics")
 
 @app.get("/api/health")
 async def health_check():

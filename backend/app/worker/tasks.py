@@ -29,10 +29,21 @@ def collect_system_metrics():
     redis_conn = None
     try:
         metrics = get_live_metrics()
+        metric_row = {
+            "cpu_usage_percent": metrics["cpu_usage_percent"],
+            "ram_usage_percent": metrics["ram_usage_percent"],
+            "gpu_utilization_percent": metrics["gpu_utilization_percent"],
+            "vram_used_mb": metrics["vram_used_mb"],
+            "vram_total_mb": metrics["vram_total_mb"],
+            "disk_system_used_gb": metrics["disk_system_used_gb"],
+            "disk_system_total_gb": metrics["disk_system_total_gb"],
+            "disk_source_used_gb": metrics["disk_source_used_gb"],
+            "disk_source_total_gb": metrics["disk_source_total_gb"],
+        }
         redis_host = os.getenv("REDIS_HOST", "redis")
         redis_port = os.getenv("REDIS_PORT", "6379")
         redis_conn = redis.Redis(host=redis_host, port=redis_port, db=0)
-        new_metric = SystemMetric(**metrics)
+        new_metric = SystemMetric(**metric_row)
         db.add(new_metric)
         
         if metrics['disk_system_total_gb'] > 0:

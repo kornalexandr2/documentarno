@@ -34,7 +34,7 @@ export const getSystemState = async (): Promise<{ state: string }> => {
   return response.json();
 };
 
-export const setSystemState = async (state: string): Promise<{ status: string }> => {
+export const setSystemState = async (state: string): Promise<{ state: string }> => {
   const response = await fetch(`${API_URL}/system/metrics/state?new_state=${state}`, {
     method: 'POST',
     headers: getAuthHeaders(),

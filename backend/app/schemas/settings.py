@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional
 
 class SettingBase(BaseModel):
     name: str
@@ -21,3 +21,19 @@ class Setting(SettingBase):
 
 class SystemStateResponse(BaseModel):
     state: str
+
+
+class PromptUpdate(BaseModel):
+    prompt: str
+
+
+class PromptResponse(BaseModel):
+    prompt: str
+
+
+class AppSettings(BaseModel):
+    system_prompt: Optional[str] = None
+    sync_mode: Optional[str] = None
+    default_model: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
