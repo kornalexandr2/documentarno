@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { API_URL, getErrorMessage } from '../api/client';
+import { API_URL, getErrorMessage, handleUnauthorizedStatus } from '../api/client';
 import { getModels, pullModel } from '../api/models';
 import { OllamaModel } from '../types/models';
 
@@ -108,6 +108,8 @@ const ModelHub: React.FC = () => {
             resolve();
             return;
           }
+
+          handleUnauthorizedStatus(xhr.status);
 
           let message = xhr.statusText || 'Upload failed';
           try {

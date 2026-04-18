@@ -1,4 +1,4 @@
-import { API_URL, ApiError, getAuthHeaders } from './client';
+import { API_URL, ApiError, getAuthHeaders, handleUnauthorizedStatus } from './client';
 import { DocumentItem } from '../types/documents';
 
 export const getDocuments = async (): Promise<DocumentItem[]> => {
@@ -6,6 +6,7 @@ export const getDocuments = async (): Promise<DocumentItem[]> => {
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
     throw new ApiError(response.status, 'Failed to fetch documents');
   }
   return response.json();
@@ -26,6 +27,7 @@ export const uploadDocument = async (file: File, priority: string = 'NORMAL'): P
   });
 
   if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
     const err = await response.json().catch(() => ({}) as { detail?: string });
     throw new ApiError(response.status, err.detail || 'Failed to upload document');
   }
@@ -39,6 +41,7 @@ export const deleteDocument = async (id: number): Promise<void> => {
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
     const err = await response.json().catch(() => ({}) as { detail?: string });
     throw new ApiError(response.status, err.detail || 'Failed to delete document');
   }
@@ -49,6 +52,9 @@ export const resetStuckDocuments = async (): Promise<{ reset_count: number }> =>
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  if (!response.ok) throw new ApiError(response.status, 'Failed to reset stuck documents');
+  if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
+    throw new ApiError(response.status, 'Failed to reset stuck documents');
+  }
   return response.json();
 };

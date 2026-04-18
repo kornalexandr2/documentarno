@@ -1,4 +1,4 @@
-import { API_URL, getAuthHeaders, ApiError } from './client';
+import { API_URL, getAuthHeaders, ApiError, getAuthToken, handleUnauthorizedStatus } from './client';
 
 export interface SystemMetricHistory {
   recorded_at: string;
@@ -19,6 +19,7 @@ export const getMetricsHistory = async (period: string = '24h'): Promise<SystemM
   });
 
   if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
     throw new ApiError(response.status, 'Failed to fetch metrics history');
   }
 
@@ -26,11 +27,11 @@ export const getMetricsHistory = async (period: string = '24h'): Promise<SystemM
 };
 
 export const getWebSocketUrl = (): string | null => {
-  const token = localStorage.getItem('token');
+  const token = getAuthToken();
   if (!token) {
-    return null; // No token, cannot establish WebSocket connection
+    return null;
   }
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.host; // This includes port (e.g., localhost:8080)
+  const host = window.location.host;
   return `${protocol}//${host}/ws/system/metrics/live?token=${token}`;
 };

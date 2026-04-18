@@ -2,7 +2,7 @@
 import { useTranslation } from 'react-i18next';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-import { getErrorMessage } from '../api/client';
+import { getErrorMessage, notifyAuthExpired } from '../api/client';
 import { getMetricsHistory, getWebSocketUrl } from '../api/system';
 
 interface MetricPoint {
@@ -121,7 +121,11 @@ const HardwareDashboard: React.FC = () => {
       setError(t('common.error', 'Failed to connect to metrics stream'));
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      if (event.code === 1008) {
+        notifyAuthExpired();
+        return;
+      }
       wsRef.current = null;
     };
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
+import { notifyAuthExpired } from '../api/client';
 import { useAuth } from '../context/auth-context';
 import { getWebSocketUrl } from '../api/system';
 
@@ -43,7 +44,11 @@ const DashboardLayout: React.FC = () => {
         }
       };
 
-      socket.onclose = () => {
+      socket.onclose = (event) => {
+        if (event.code === 1008) {
+          notifyAuthExpired();
+          return;
+        }
         reconnectTimer = window.setTimeout(connect, 3000);
       };
     };

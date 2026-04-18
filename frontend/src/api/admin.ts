@@ -1,11 +1,14 @@
-import { API_URL, getAuthHeaders, ApiError } from './client';
+import { API_URL, getAuthHeaders, ApiError, handleUnauthorizedStatus } from './client';
 
 export const triggerLockdown = async (): Promise<void> => {
   const response = await fetch(`${API_URL}/system/metrics/lockdown`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  if (!response.ok) throw new ApiError(response.status, 'Failed to trigger lockdown');
+  if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
+    throw new ApiError(response.status, 'Failed to trigger lockdown');
+  }
 };
 
 export const triggerUnlock = async (): Promise<void> => {
@@ -13,7 +16,10 @@ export const triggerUnlock = async (): Promise<void> => {
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  if (!response.ok) throw new ApiError(response.status, 'Failed to remove lockdown');
+  if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
+    throw new ApiError(response.status, 'Failed to remove lockdown');
+  }
 };
 
 export const kickAllUsers = async (): Promise<void> => {
@@ -21,7 +27,10 @@ export const kickAllUsers = async (): Promise<void> => {
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  if (!response.ok) throw new ApiError(response.status, 'Failed to kick users');
+  if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
+    throw new ApiError(response.status, 'Failed to kick users');
+  }
 };
 
 export const getSystemState = async (): Promise<{ state: string }> => {
@@ -29,6 +38,7 @@ export const getSystemState = async (): Promise<{ state: string }> => {
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
     throw new ApiError(response.status, 'Failed to get system state');
   }
   return response.json();
@@ -40,6 +50,7 @@ export const setSystemState = async (state: string): Promise<{ state: string }> 
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
     throw new ApiError(response.status, 'Failed to set system state');
   }
   return response.json();
@@ -50,6 +61,7 @@ export const getSystemLogs = async (lines = 100, container = 'doc_backend'): Pro
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
     throw new ApiError(response.status, 'Failed to get system logs');
   }
   return response.json();

@@ -1,4 +1,4 @@
-﻿import { API_URL, ApiError, getAuthHeaders } from './client';
+import { API_URL, ApiError, getAuthHeaders, handleUnauthorizedStatus } from './client';
 import { ModelListResponse } from '../types/models';
 
 export const getModels = async (): Promise<ModelListResponse> => {
@@ -7,6 +7,7 @@ export const getModels = async (): Promise<ModelListResponse> => {
   });
 
   if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
     throw new ApiError(response.status, 'Failed to fetch models');
   }
 
@@ -21,6 +22,7 @@ export const pullModel = async (modelName: string): Promise<{ status: string }> 
   });
 
   if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
     const err = await response.json().catch(() => ({}) as { detail?: string });
     throw new ApiError(response.status, err.detail || 'Failed to pull model');
   }
@@ -43,6 +45,7 @@ export const uploadModel = async (file: File, modelName: string): Promise<{ stat
   });
 
   if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
     const err = await response.json().catch(() => ({}) as { detail?: string });
     throw new ApiError(response.status, err.detail || 'Failed to upload model');
   }

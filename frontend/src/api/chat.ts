@@ -1,4 +1,4 @@
-﻿import { API_URL, ApiError, getAuthHeaders } from './client';
+import { API_URL, ApiError, getAuthHeaders, handleUnauthorizedStatus } from './client';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -32,6 +32,7 @@ export const sendChatMessage = async (
   });
 
   if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
     const err = await response.json().catch(() => ({}) as { detail?: string });
     throw new ApiError(response.status, err.detail || 'Chat request failed');
   }
