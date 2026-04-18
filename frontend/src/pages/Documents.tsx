@@ -90,6 +90,8 @@ const Documents: React.FC = () => {
     }
   };
 
+  const activeProgressDoc = documents.find((doc) => doc.status === 'PROCESSING' && doc.overall_percent != null);
+
   return (
     <div className="p-6 text-white h-full flex flex-col">
       <h1 className="text-3xl font-bold mb-6">{t('documents.title')}</h1>
@@ -136,6 +138,47 @@ const Documents: React.FC = () => {
         </form>
       </div>
 
+      {activeProgressDoc && (
+        <div className="bg-gray-800 rounded-lg p-6 border border-blue-700/40 mb-6">
+          <div className="flex flex-col gap-4">
+            <div>
+              <div className="text-sm uppercase tracking-wide text-blue-400 font-bold">
+                {t('documents.status_processing')}
+              </div>
+              <div className="text-lg text-white font-semibold mt-1">{activeProgressDoc.filename}</div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div className="flex justify-between text-xs text-gray-300 mb-1">
+                  <span>{`Общий прогресс: ${activeProgressDoc.completed_docs ?? 0}/${activeProgressDoc.total_docs ?? 0}`}</span>
+                  <span>{`${(activeProgressDoc.overall_percent ?? 0).toFixed(1)}%`}</span>
+                </div>
+                <div className="w-full h-2.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-500"
+                    style={{ width: `${activeProgressDoc.overall_percent ?? 0}%` }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-xs text-gray-300 mb-1">
+                  <span>{`Текущий документ: ${activeProgressDoc.current_page ?? 0}/${activeProgressDoc.total_pages ?? 0} стр.`}</span>
+                  <span>{`${(activeProgressDoc.current_document_percent ?? 0).toFixed(1)}%`}</span>
+                </div>
+                <div className="w-full h-2.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 transition-all duration-500"
+                    style={{ width: `${activeProgressDoc.current_document_percent ?? 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 bg-gray-800 rounded-lg border border-gray-700 overflow-hidden flex flex-col">
         <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800/50">
           <h2 className="text-xl font-semibold">{t('documents.list_title')}</h2>
@@ -172,6 +215,30 @@ const Documents: React.FC = () => {
                           <span className={`px-2.5 py-1 rounded-full text-xs font-bold border w-fit ${getStatusColor(doc.status)}`}>
                             {t('documents.status_' + doc.status.toLowerCase(), doc.status)}
                           </span>
+                          {doc.status === 'PROCESSING' && doc.current_document_percent != null && (
+                            <div className="mt-2 w-[220px] max-w-full">
+                              <div className="flex justify-between text-[10px] text-blue-300 mb-1">
+                                <span>{`Очередь ${doc.completed_docs ?? 0}/${doc.total_docs ?? 0}`}</span>
+                                <span>{`${(doc.overall_percent ?? 0).toFixed(1)}%`}</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-emerald-500 transition-all duration-500"
+                                  style={{ width: `${doc.overall_percent ?? 0}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between text-[10px] text-blue-300 mt-1 mb-1">
+                                <span>{`${doc.current_page ?? 0}/${doc.total_pages ?? 0} стр.`}</span>
+                                <span>{`${(doc.current_document_percent ?? 0).toFixed(1)}%`}</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-blue-500 transition-all duration-500"
+                                  style={{ width: `${doc.current_document_percent ?? 0}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
                           {doc.status === 'ERROR' && doc.error_message && (
                             <span className="text-[10px] text-red-400 mt-1 max-w-[250px] break-words" title={doc.error_message}>
                               {doc.error_message}

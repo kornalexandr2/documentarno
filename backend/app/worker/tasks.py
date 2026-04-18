@@ -121,6 +121,9 @@ def ocr_heavy(self, doc_id: int):
         
         doc_source_path = os.getenv("DOC_SOURCE_PATH", "/app/doc_source")
         file_path = os.path.join(doc_source_path, doc.source_path)
+        r_sync.set("APP_STATE", "PROCESSING")
+        initial_progress = build_ocr_progress_payload(db, r_sync, doc_id, doc.filename, 0, 0)
+        r_sync.set("OCR_PROGRESS", json.dumps(initial_progress), ex=300)
         
         def update_redis_progress(current, total):
             progress_data = build_ocr_progress_payload(db, r_sync, doc_id, doc.filename, current, total)

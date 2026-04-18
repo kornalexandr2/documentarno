@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin_user, get_current_user
+from app.core.redis import get_redis
 from app.db.models import Document, User
 from app.db.session import get_db
 from app.schemas.document import DocumentResponse
@@ -25,6 +26,23 @@ def resolve_document_path(source_path: str) -> Path:
     source_dir = Path(DOC_SOURCE_PATH).resolve()
     # source_path here is the safe internal filename (UUID based)
     return source_dir / source_path
+
+
+def apply_ocr_progress(doc: Document, progress_data: dict | None) -> DocumentResponse:
+    response = DocumentResponse.model_validate(doc)
+    if not progress_data or progress_data.get("doc_id") != doc.id:
+        return response
+
+    response.current_page = progress_data.get("current_page")
+    response.total_pages = progress_data.get("total_pages")
+    response.current_document_percent = progress_data.get("current_document_percent")
+    response.current_document_index = progress_data.get("current_document_index")
+    response.completed_docs = progress_data.get("completed_docs")
+    response.total_docs = progress_data.get("total_docs")
+    response.remaining_docs = progress_data.get("remaining_docs")
+    response.overall_percent = progress_data.get("overall_percent")
+    response.updated_at = progress_data.get("updated_at")
+    return response
 
 
 @router.post("/upload", response_model=DocumentResponse)
@@ -87,10 +105,19 @@ async def list_documents(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+    current_user: User = Depends(get_current_admin_user),
+    redis_client = Depends(get_redis),
 ):
     docs = db.query(Document).order_by(Document.created_at.desc()).offset(skip).limit(limit).all()
-    return docs
+    raw_progress = await redis_client.get("OCR_PROGRESS")
+    progress_data = None
+    if raw_progress:
+        try:
+            progress_data = json.loads(raw_progress)
+        except json.JSONDecodeError:
+            progress_data = None
+
+    return [apply_ocr_progress(doc, progress_data) for doc in docs]
 
 
 @router.get("/{doc_id}/download")
