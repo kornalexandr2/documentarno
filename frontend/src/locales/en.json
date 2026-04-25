@@ -75,6 +75,11 @@
   "chat": {
     "title": "RAG Chat",
     "welcome": "Hi! I'm the Documentarno AI assistant. Select a document from the list above and ask me a question.",
+    "history": "Chat history is kept locally in this browser.",
+    "new_chat": "New chat",
+    "empty_history": "No messages yet",
+    "generating": "Generating...",
+    "background_notice": "Another chat is still generating in the background. It will continue even if this page is not open.",
     "select_doc": "Select Document...",
     "typing": "Typing...",
     "placeholder": "Ask a question about the document...",

@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ChatProvider } from './context/ChatContext';
 
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -14,28 +15,29 @@ import DashboardLayout from './layouts/DashboardLayout';
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          <Route path="/" element={<DashboardLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="chat" element={<Chat />} />
-            <Route path="models" element={<ModelHub />} />
-            <Route path="hardware" element={<HardwareDashboard />} />
-            <Route path="documents" element={<Documents />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-          
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <ChatProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            
+            <Route path="/" element={<DashboardLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="chat" element={<Chat />} />
+              <Route path="models" element={<ModelHub />} />
+              <Route path="hardware" element={<HardwareDashboard />} />
+              <Route path="documents" element={<Documents />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+            
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </ChatProvider>
     </AuthProvider>
   );
 }
 
 export default App;
-
 
 
 
