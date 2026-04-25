@@ -68,6 +68,13 @@ services:
       - ${DOC_SOURCE_PATH:-./doc_source}:/app/doc_source
       - ${DATA_PATH:-./data}/ollama:/app/models
       - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     healthcheck:
       test: ["CMD-SHELL", "python3 -c 'import socket; s = socket.socket(); s.connect((\"localhost\", 8000))' || exit 1"]
       interval: 10s

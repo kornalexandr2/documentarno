@@ -2,13 +2,39 @@ import os
 import psutil
 import redis
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     import pynvml
-    pynvml.nvmlInit()
-    NVML_AVAILABLE = True
-except Exception:
-    NVML_AVAILABLE = False
+except Exception as exc:
+    pynvml = None
+    logger.warning("NVML import unavailable, GPU metrics disabled: %s", exc)
+
+NVML_AVAILABLE = False
+_NVML_ERROR_LOGGED = False
+
+
+def _ensure_nvml_initialized() -> bool:
+    global NVML_AVAILABLE, _NVML_ERROR_LOGGED
+
+    if pynvml is None:
+        return False
+
+    if NVML_AVAILABLE:
+        return True
+
+    try:
+        pynvml.nvmlInit()
+        NVML_AVAILABLE = True
+        logger.info("NVML initialized successfully, GPU metrics enabled.")
+        return True
+    except Exception as exc:
+        if not _NVML_ERROR_LOGGED:
+            logger.warning("NVML initialization failed, GPU metrics will report zero until fixed: %s", exc)
+            _NVML_ERROR_LOGGED = True
+        return False
 
 # Sync redis client for metrics gathering
 redis_sync = redis.Redis(
@@ -54,7 +80,7 @@ def get_live_metrics():
     vram_used = 0
     vram_total = 0
     
-    if NVML_AVAILABLE:
+    if _ensure_nvml_initialized():
         try:
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             util = pynvml.nvmlDeviceGetUtilizationRates(handle)
@@ -62,8 +88,8 @@ def get_live_metrics():
             mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
             vram_used = mem_info.used // (1024**2)
             vram_total = mem_info.total // (1024**2)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to read GPU metrics from NVML, reporting zero values: %s", exc)
             
     return {
         "app_state": app_state,
