@@ -155,7 +155,24 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            live_metrics = get_live_metrics()
+            try:
+                live_metrics = get_live_metrics()
+            except Exception as exc:
+                logger.exception("Failed to collect live metrics, sending safe defaults: %s", exc)
+                live_metrics = {
+                    "app_state": "SEARCH",
+                    "ocr_progress": None,
+                    "cpu_usage_percent": 0.0,
+                    "ram_usage_percent": 0.0,
+                    "gpu_utilization_percent": 0.0,
+                    "vram_used_mb": 0,
+                    "vram_total_mb": 0,
+                    "disk_system_used_gb": 0.0,
+                    "disk_system_total_gb": 0.0,
+                    "disk_source_used_gb": 0.0,
+                    "disk_source_total_gb": 0.0,
+                }
+
             live_metrics["recorded_at"] = datetime.utcnow().isoformat()
             await websocket.send_json(live_metrics)
             await asyncio.sleep(2)

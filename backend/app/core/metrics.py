@@ -1,8 +1,10 @@
-import os
-import psutil
-import redis
 import json
 import logging
+import os
+import subprocess
+
+import psutil
+import redis
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +16,7 @@ except Exception as exc:
 
 NVML_AVAILABLE = False
 _NVML_ERROR_LOGGED = False
+_NVIDIA_SMI_ERROR_LOGGED = False
 
 
 def _ensure_nvml_initialized() -> bool:
@@ -36,61 +39,94 @@ def _ensure_nvml_initialized() -> bool:
             _NVML_ERROR_LOGGED = True
         return False
 
+
+def _read_gpu_metrics_via_nvml() -> tuple[float, int, int] | None:
+    try:
+        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+        mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+        return util.gpu, mem_info.used // (1024**2), mem_info.total // (1024**2)
+    except Exception as exc:
+        logger.warning("Failed to read GPU metrics from NVML: %s", exc)
+        return None
+
+
+def _read_gpu_metrics_via_nvidia_smi() -> tuple[float, int, int] | None:
+    global _NVIDIA_SMI_ERROR_LOGGED
+
+    try:
+        cmd = [
+            "nvidia-smi",
+            "--query-gpu=utilization.gpu,memory.used,memory.total",
+            "--format=csv,noheader,nounits",
+        ]
+        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True, timeout=3)
+        first_line = output.strip().splitlines()[0]
+        gpu_util_str, vram_used_str, vram_total_str = [item.strip() for item in first_line.split(",")]
+        return float(gpu_util_str), int(vram_used_str), int(vram_total_str)
+    except Exception as exc:
+        if not _NVIDIA_SMI_ERROR_LOGGED:
+            logger.warning("nvidia-smi fallback unavailable, GPU metrics will report zero: %s", exc)
+            _NVIDIA_SMI_ERROR_LOGGED = True
+        return None
+
+
+def _get_redis_values() -> tuple[str, dict | None]:
+    try:
+        app_state = redis_sync.get("APP_STATE") or "SEARCH"
+        ocr_progress = redis_sync.get("OCR_PROGRESS")
+        ocr_data = json.loads(ocr_progress) if ocr_progress else None
+        return app_state, ocr_data
+    except Exception as exc:
+        logger.warning("Failed to read live state from Redis, using safe defaults: %s", exc)
+        return "SEARCH", None
+
+
+def _get_disk_usage_gb(path: str) -> tuple[float, float]:
+    try:
+        disk = psutil.disk_usage(path)
+        return disk.used / (1024**3), disk.total / (1024**3)
+    except Exception as exc:
+        logger.warning("Failed to read disk usage for path %s, using zero values: %s", path, exc)
+        return 0.0, 0.0
+
+
 # Sync redis client for metrics gathering
 redis_sync = redis.Redis(
     host=os.getenv("REDIS_HOST", "redis"),
     port=int(os.getenv("REDIS_PORT", "6379")),
     db=0,
-    decode_responses=True
+    decode_responses=True,
 )
 
+
 def get_live_metrics():
-    # CPU
     cpu_usage = psutil.cpu_percent(interval=None)
-    
-    # RAM
     ram = psutil.virtual_memory()
     ram_usage = ram.percent
-    
-    # State and Progress from Redis
-    app_state = redis_sync.get("APP_STATE") or "SEARCH"
-    ocr_progress = redis_sync.get("OCR_PROGRESS")
-    try:
-        ocr_data = json.loads(ocr_progress) if ocr_progress else None
-    except Exception:
-        ocr_data = None
 
-    # Disks - platform-agnostic root
+    app_state, ocr_data = _get_redis_values()
+
     root_path = os.path.abspath(os.sep)
-    sys_disk = psutil.disk_usage(root_path)
-    sys_disk_used_gb = sys_disk.used / (1024**3)
-    sys_disk_total_gb = sys_disk.total / (1024**3)
-    
-    source_path = os.getenv("DOC_SOURCE_PATH", "./doc_source")
-    try:
-        source_disk = psutil.disk_usage(source_path)
-        source_disk_used_gb = source_disk.used / (1024**3)
-        source_disk_total_gb = source_disk.total / (1024**3)
-    except FileNotFoundError:
-        source_disk_used_gb = 0.0
-        source_disk_total_gb = 0.0
+    sys_disk_used_gb, sys_disk_total_gb = _get_disk_usage_gb(root_path)
 
-    # GPU
+    source_path = os.getenv("DOC_SOURCE_PATH", "./doc_source")
+    source_disk_used_gb, source_disk_total_gb = _get_disk_usage_gb(source_path)
+
     gpu_util = 0.0
     vram_used = 0
     vram_total = 0
-    
+
+    gpu_metrics: tuple[float, int, int] | None = None
     if _ensure_nvml_initialized():
-        try:
-            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-            util = pynvml.nvmlDeviceGetUtilizationRates(handle)
-            gpu_util = util.gpu
-            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-            vram_used = mem_info.used // (1024**2)
-            vram_total = mem_info.total // (1024**2)
-        except Exception as exc:
-            logger.warning("Failed to read GPU metrics from NVML, reporting zero values: %s", exc)
-            
+        gpu_metrics = _read_gpu_metrics_via_nvml()
+
+    if gpu_metrics is None:
+        gpu_metrics = _read_gpu_metrics_via_nvidia_smi()
+
+    if gpu_metrics is not None:
+        gpu_util, vram_used, vram_total = gpu_metrics
+
     return {
         "app_state": app_state,
         "ocr_progress": ocr_data,
