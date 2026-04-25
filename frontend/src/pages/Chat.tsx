@@ -133,7 +133,7 @@ const RAGChat: React.FC = () => {
           >
             <option value="" disabled>{t('chat.select_doc')}</option>
             {documents.map((doc) => (
-              <option key={doc.id} value={doc.id}>{doc.source_path}</option>
+              <option key={doc.id} value={doc.id}>{doc.filename}</option>
             ))}
           </select>
         </div>
