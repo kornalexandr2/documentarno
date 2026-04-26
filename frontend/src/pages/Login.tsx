@@ -1,6 +1,6 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 import { login as apiLogin } from '../api/auth';
 import { useAuth } from '../context/auth-context';
@@ -9,7 +9,7 @@ const Login: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -17,6 +17,10 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const from = location.state?.from?.pathname || '/';
+
+  if (isAuthenticated) {
+    return <Navigate to={from} replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
