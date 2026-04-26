@@ -65,7 +65,7 @@ export const notifyAuthExpired = (): void => {
 };
 
 export const handleUnauthorizedStatus = (status: number): void => {
-  if (status === 401 || status === 403) {
+  if (status === 401) {
     notifyAuthExpired();
   }
 };
