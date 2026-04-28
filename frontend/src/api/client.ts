@@ -37,26 +37,15 @@ export const clearAuthToken = (): void => {
 };
 
 export const isTokenExpired = (token: string): boolean => {
-  const expirationTime = getTokenExpirationTime(token);
-  if (!expirationTime) {
-    return true;
-  }
-
-  return expirationTime <= Date.now();
+  // We do not strictly check token expiration on the frontend
+  // because clock skew between client and server (especially with Docker on Windows)
+  // can cause immediate unexpected logouts. 
+  // We rely on the backend returning 401 Unauthorized.
+  return false;
 };
 
 export const getAuthToken = (): string | null => {
-  const token = localStorage.getItem('token');
-  if (!token) {
-    return null;
-  }
-
-  if (isTokenExpired(token)) {
-    clearAuthToken();
-    return null;
-  }
-
-  return token;
+  return localStorage.getItem('token');
 };
 
 export const notifyAuthExpired = (): void => {
