@@ -7,14 +7,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [token, setToken] = useState<string | null>(() => getAuthToken());
 
   useEffect(() => {
-    if (token) {
-      localStorage.setItem('token', token);
-    } else {
-      clearAuthToken();
-    }
-  }, [token]);
-
-  useEffect(() => {
     if (!token) {
       return;
     }
@@ -38,10 +30,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = (newToken: string) => {
+    localStorage.setItem('token', newToken);
     setToken(newToken);
   };
 
   const logout = () => {
+    clearAuthToken();
     setToken(null);
   };
 
