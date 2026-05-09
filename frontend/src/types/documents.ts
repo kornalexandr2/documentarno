@@ -1,3 +1,11 @@
+export interface DocumentEventItem {
+  id: number;
+  document_id: number;
+  event_type: string;
+  message: string;
+  created_at: string;
+}
+
 export interface DocumentItem {
   id: number;
   filename: string;
@@ -6,6 +14,8 @@ export interface DocumentItem {
   priority: string;
   error_message?: string;
   created_at: string;
+  processed_at?: string | null;
+  events?: DocumentEventItem[];
   current_page?: number | null;
   total_pages?: number | null;
   current_document_percent?: number | null;

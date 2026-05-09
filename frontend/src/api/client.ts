@@ -2,11 +2,41 @@ export const API_URL = '/api';
 export const AUTH_EXPIRED_EVENT = 'documentarno:auth-expired';
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
+  constructor(public status: number, message: unknown) {
+    super(formatErrorDetail(message));
     this.name = 'ApiError';
   }
 }
+
+const formatErrorDetail = (detail: unknown): string => {
+  if (typeof detail === 'string') {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'msg' in item) {
+          return String((item as { msg: unknown }).msg);
+        }
+        return JSON.stringify(item);
+      })
+      .join('; ');
+  }
+
+  if (detail && typeof detail === 'object') {
+    if ('detail' in detail) {
+      return formatErrorDetail((detail as { detail: unknown }).detail);
+    }
+    if ('message' in detail) {
+      return formatErrorDetail((detail as { message: unknown }).message);
+    }
+    return JSON.stringify(detail);
+  }
+
+  return 'An error occurred';
+};
 
 const decodeBase64Url = (value: string): string => {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');

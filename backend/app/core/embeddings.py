@@ -3,6 +3,7 @@ import uuid
 import numpy as np
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client.models import PointStruct
+from qdrant_client.http.models import FieldCondition, Filter, MatchValue
 
 from app.core.qdrant import get_qdrant_client, COLLECTION_NAME
 
@@ -21,6 +22,21 @@ def get_embedding_model():
         logger.info(f"Loading intfloat/multilingual-e5-large on {device}...")
         _embedding_model = SentenceTransformer("intfloat/multilingual-e5-large", device=device)
     return _embedding_model
+
+def delete_document_vectors(doc_id: int) -> None:
+    client = get_qdrant_client()
+    client.delete(
+        collection_name=COLLECTION_NAME,
+        points_selector=Filter(
+            must=[
+                FieldCondition(
+                    key="doc_id",
+                    match=MatchValue(value=doc_id),
+                )
+            ]
+        ),
+    )
+
 
 def process_and_store_document(doc_id: int, markdown_text: str):
     """

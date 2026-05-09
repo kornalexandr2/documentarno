@@ -47,6 +47,19 @@ export const deleteDocument = async (id: number): Promise<void> => {
   }
 };
 
+export const retryDocument = async (id: number): Promise<DocumentItem> => {
+  const response = await fetch(`${API_URL}/documents/${id}/retry`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    handleUnauthorizedStatus(response.status);
+    const err = await response.json().catch(() => ({}) as { detail?: string });
+    throw new ApiError(response.status, err.detail || 'Failed to retry document processing');
+  }
+  return response.json();
+};
+
 export const resetStuckDocuments = async (): Promise<{ reset_count: number }> => {
   const response = await fetch(`${API_URL}/documents/reset-stuck`, {
     method: 'POST',

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getErrorMessage } from '../api/client';
-import { deleteDocument, getDocuments, uploadDocument } from '../api/documents';
+import { deleteDocument, getDocuments, retryDocument, uploadDocument } from '../api/documents';
 import { DocumentItem } from '../types/documents';
 
 const Documents: React.FC = () => {
@@ -14,8 +14,11 @@ const Documents: React.FC = () => {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [priority, setPriority] = useState('NORMAL');
   const [uploading, setUploading] = useState(false);
+  const [retryingId, setRetryingId] = useState<number | null>(null);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<number | null>(null);
   
   const pollTimerRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchDocs = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -31,7 +34,7 @@ const Documents: React.FC = () => {
         pollTimerRef.current = window.setTimeout(() => void fetchDocs(true), 3000);
       }
     } catch (err: unknown) {
-      if (!silent) setError(getErrorMessage(err, 'Failed to load documents'));
+      if (!silent) setError(getErrorMessage(err, t('documents.load_error')));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -53,6 +56,9 @@ const Documents: React.FC = () => {
     try {
       await uploadDocument(uploadFile, priority);
       setUploadFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       await fetchDocs();
     } catch (err: unknown) {
       setError(getErrorMessage(err, t('common.error')));
@@ -67,7 +73,7 @@ const Documents: React.FC = () => {
       await deleteDocument(id);
       await fetchDocs();
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to delete document'));
+      setError(getErrorMessage(err, t('documents.delete_error')));
     }
   };
 
@@ -90,6 +96,37 @@ const Documents: React.FC = () => {
     }
   };
 
+  const handleRetry = async (id: number) => {
+    setRetryingId(id);
+    setError(null);
+    try {
+      await retryDocument(id);
+      await fetchDocs();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('documents.retry_error')));
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return t('documents.not_processed');
+    return new Date(value).toLocaleString();
+  };
+
+  const formatDocumentMessage = (message: string) => {
+    if (message.includes('unexpected page structure') || message.includes('string indices must be integers')) {
+      return t('documents.error_unexpected_pdf_structure');
+    }
+    if (message.includes('No text could be extracted')) {
+      return t('documents.error_no_text');
+    }
+    if (message.includes('source file is missing')) {
+      return t('documents.error_missing_file');
+    }
+    return message;
+  };
+
   const activeProgressDoc = documents.find((doc) => doc.status === 'PROCESSING' && doc.overall_percent != null);
 
   return (
@@ -108,6 +145,7 @@ const Documents: React.FC = () => {
           <div className="flex-1 w-full">
             <label className="block text-sm mb-2">{t('documents.file')}</label>
             <input
+              ref={fileInputRef}
               type="file"
               accept=".pdf,.docx"
               onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
@@ -151,7 +189,7 @@ const Documents: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <div className="flex justify-between text-xs text-gray-300 mb-1">
-                  <span>{`Общий прогресс: ${activeProgressDoc.completed_docs ?? 0}/${activeProgressDoc.total_docs ?? 0}`}</span>
+                  <span>{t('documents.overall_progress', { completed: activeProgressDoc.completed_docs ?? 0, total: activeProgressDoc.total_docs ?? 0 })}</span>
                   <span>{`${(activeProgressDoc.overall_percent ?? 0).toFixed(1)}%`}</span>
                 </div>
                 <div className="w-full h-2.5 bg-gray-700 rounded-full overflow-hidden">
@@ -164,7 +202,7 @@ const Documents: React.FC = () => {
 
               <div>
                 <div className="flex justify-between text-xs text-gray-300 mb-1">
-                  <span>{`Текущий документ: ${activeProgressDoc.current_page ?? 0}/${activeProgressDoc.total_pages ?? 0} стр.`}</span>
+                  <span>{t('documents.pages_progress', { current: activeProgressDoc.current_page ?? 0, total: activeProgressDoc.total_pages ?? 0 })}</span>
                   <span>{`${(activeProgressDoc.current_document_percent ?? 0).toFixed(1)}%`}</span>
                 </div>
                 <div className="w-full h-2.5 bg-gray-700 rounded-full overflow-hidden">
@@ -201,13 +239,15 @@ const Documents: React.FC = () => {
                     <th className="py-3 px-4 font-medium">{t('documents.filename')}</th>
                     <th className="py-3 px-4 font-medium">{t('documents.status')}</th>
                     <th className="py-3 px-4 font-medium">{t('documents.priority')}</th>
-                    <th className="py-3 px-4 font-medium">{t('documents.date')}</th>
+                    <th className="py-3 px-4 font-medium">{t('documents.added_at')}</th>
+                    <th className="py-3 px-4 font-medium">{t('documents.processed_at')}</th>
                     <th className="py-3 px-4 font-medium text-right">{t('documents.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {documents.map((doc) => (
-                    <tr key={doc.id} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
+                    <React.Fragment key={doc.id}>
+                    <tr className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
                       <td className="py-3 px-4 text-gray-400">#{doc.id}</td>
                       <td className="py-3 px-4 font-medium">{doc.filename}</td>
                       <td className="py-3 px-4">
@@ -218,7 +258,7 @@ const Documents: React.FC = () => {
                           {doc.status === 'PROCESSING' && doc.current_document_percent != null && (
                             <div className="mt-2 w-[220px] max-w-full">
                               <div className="flex justify-between text-[10px] text-blue-300 mb-1">
-                                <span>{`Очередь ${doc.completed_docs ?? 0}/${doc.total_docs ?? 0}`}</span>
+                                <span>{t('documents.queue_progress', { completed: doc.completed_docs ?? 0, total: doc.total_docs ?? 0 })}</span>
                                 <span>{`${(doc.overall_percent ?? 0).toFixed(1)}%`}</span>
                               </div>
                               <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
@@ -228,7 +268,7 @@ const Documents: React.FC = () => {
                                 />
                               </div>
                               <div className="flex justify-between text-[10px] text-blue-300 mt-1 mb-1">
-                                <span>{`${doc.current_page ?? 0}/${doc.total_pages ?? 0} стр.`}</span>
+                                <span>{t('documents.pages_progress', { current: doc.current_page ?? 0, total: doc.total_pages ?? 0 })}</span>
                                 <span>{`${(doc.current_document_percent ?? 0).toFixed(1)}%`}</span>
                               </div>
                               <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
@@ -241,7 +281,7 @@ const Documents: React.FC = () => {
                           )}
                           {doc.status === 'ERROR' && doc.error_message && (
                             <span className="text-[10px] text-red-400 mt-1 max-w-[250px] break-words" title={doc.error_message}>
-                              {doc.error_message}
+                              {formatDocumentMessage(doc.error_message)}
                             </span>
                           )}
                         </div>
@@ -250,17 +290,61 @@ const Documents: React.FC = () => {
                         {t('documents.prio_' + doc.priority.toLowerCase(), doc.priority)}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-400">
-                        {new Date(doc.created_at).toLocaleString()}
+                        {formatDate(doc.created_at)}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-gray-400">
+                        {formatDate(doc.processed_at)}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => void handleDelete(doc.id)}
-                          className="text-red-400 hover:text-red-300 text-sm font-medium px-3 py-1 rounded hover:bg-red-400/10 transition-colors"
-                        >
-                          {t('common.delete')}
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedHistoryId(expandedHistoryId === doc.id ? null : doc.id)}
+                            className="text-blue-400 hover:text-blue-300 text-sm font-medium px-3 py-1 rounded hover:bg-blue-400/10 transition-colors"
+                          >
+                            {t('documents.history')}
+                          </button>
+                          {doc.status === 'ERROR' && (
+                            <button
+                              type="button"
+                              onClick={() => void handleRetry(doc.id)}
+                              disabled={retryingId === doc.id}
+                              className="text-emerald-400 hover:text-emerald-300 text-sm font-medium px-3 py-1 rounded hover:bg-emerald-400/10 transition-colors disabled:opacity-50"
+                            >
+                              {retryingId === doc.id ? t('common.loading') : t('documents.retry')}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => void handleDelete(doc.id)}
+                            className="text-red-400 hover:text-red-300 text-sm font-medium px-3 py-1 rounded hover:bg-red-400/10 transition-colors"
+                          >
+                            {t('common.delete')}
+                          </button>
+                        </div>
                       </td>
                     </tr>
+                    {expandedHistoryId === doc.id && (
+                      <tr className="border-b border-gray-700/50 bg-gray-900/60">
+                        <td colSpan={7} className="px-4 py-4">
+                          <div className="space-y-2">
+                            {(doc.events || []).length === 0 ? (
+                              <div className="text-sm text-gray-400">{t('documents.no_history')}</div>
+                            ) : (
+                              (doc.events || []).map((event) => (
+                                <div key={event.id} className="flex flex-col md:flex-row md:items-start gap-1 md:gap-4 text-sm">
+                                  <span className="text-gray-500 md:w-44 flex-shrink-0">{formatDate(event.created_at)}</span>
+                                  <span className="text-blue-300 md:w-40 flex-shrink-0">
+                                    {t(`documents.event_${event.event_type}`, event.event_type)}
+                                  </span>
+                                  <span className="text-gray-300">{formatDocumentMessage(event.message)}</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

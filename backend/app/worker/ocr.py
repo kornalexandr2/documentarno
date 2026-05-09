@@ -1,7 +1,7 @@
 import logging
 import os
 import tempfile
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import fitz  # PyMuPDF
 import torch
@@ -51,6 +51,40 @@ def _is_gpu_runtime_error(exc: Exception) -> bool:
     return "cudnn" in message or "preconditionnotmet" in message or "cuda" in message
 
 
+def _extract_text_lines(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        return [text] if text else []
+    if isinstance(value, dict):
+        if "text" in value:
+            return _extract_text_lines(value.get("text"))
+        if "res" in value:
+            return _extract_text_lines(value.get("res"))
+        return []
+    if isinstance(value, (list, tuple)):
+        lines: list[str] = []
+        for item in value:
+            lines.extend(_extract_text_lines(item))
+        return lines
+
+    text = str(value).strip()
+    return [text] if text else []
+
+
+def _extract_table_html(value: Any) -> str:
+    if isinstance(value, dict):
+        html = value.get("html")
+        return html if isinstance(html, str) else ""
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            html = _extract_table_html(item)
+            if html:
+                return html
+    return ""
+
+
 def process_pdf_to_markdown(file_path: str, progress_callback: Optional[Callable[[int, int], None]] = None) -> str:
     """
     Extract text and tables from a PDF using PaddleOCR PPStructure.
@@ -65,6 +99,9 @@ def process_pdf_to_markdown(file_path: str, progress_callback: Optional[Callable
         markdown_content = []
         temp_dir = tempfile.gettempdir()
         total_pages = len(doc)
+
+        if total_pages == 0:
+            raise RuntimeError("PDF does not contain pages.")
 
         for page_num in range(total_pages):
             if progress_callback:
@@ -91,31 +128,54 @@ def process_pdf_to_markdown(file_path: str, progress_callback: Optional[Callable
                     else:
                         raise
 
-                markdown_content.append(f"\n## Страница {page_num + 1}\n")
+                markdown_content.append(f"\n## Page {page_num + 1}\n")
+
+                if not result:
+                    logger.warning("OCR returned no regions for page %s.", page_num + 1)
+                    continue
 
                 for region in result:
-                    region_type = region["type"]
-                    res = region["res"]
+                    if not isinstance(region, dict):
+                        text_block = " ".join(_extract_text_lines(region))
+                        if text_block:
+                            markdown_content.append(text_block)
+                        else:
+                            logger.warning("Skipping unsupported OCR region on page %s: %r", page_num + 1, region)
+                        continue
+
+                    region_type = str(region.get("type") or "Text")
+                    res = region.get("res")
 
                     if region_type == "Table":
-                        html_table = res.get("html", "")
+                        html_table = _extract_table_html(res)
                         if html_table:
                             md_table = md(html_table, strip=["html", "body", "head"])
                             markdown_content.append(md_table.strip())
+                        else:
+                            text_block = " ".join(_extract_text_lines(res))
+                            if text_block:
+                                markdown_content.append(text_block)
                     elif region_type in ["Figure", "Equation"]:
-                        markdown_content.append("\n*[Изображение/График]*\n")
+                        markdown_content.append("\n*[Image/Figure]*\n")
                     else:
-                        text_lines = [line["text"] for line in res]
+                        text_lines = _extract_text_lines(res)
                         text_block = " ".join(text_lines)
+                        if not text_block:
+                            continue
                         if region_type == "Title":
                             markdown_content.append(f"\n### {text_block}\n")
                         else:
                             markdown_content.append(text_block)
+            except Exception as exc:
+                raise RuntimeError(f"Could not recognize page {page_num + 1} of {total_pages}: {exc}") from exc
             finally:
                 if os.path.exists(temp_img_path):
                     os.remove(temp_img_path)
 
-        return "\n".join(markdown_content)
+        markdown_text = "\n".join(markdown_content).strip()
+        if not markdown_text:
+            raise RuntimeError("No text could be extracted from this PDF.")
+        return markdown_text
     finally:
         if doc is not None:
             doc.close()

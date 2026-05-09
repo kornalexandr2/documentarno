@@ -6,6 +6,7 @@ from watchdog.events import FileSystemEventHandler
 
 from app.db.session import SessionLocal
 from app.db.models import Document, SystemSetting
+from app.core.document_events import add_document_event
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("fs_watchdog")
@@ -34,6 +35,7 @@ class DocumentHandler(FileSystemEventHandler):
             exists = db.query(Document).filter(Document.source_path == filename).first()
             if not exists:
                 new_doc = Document(
+                    filename=filename,
                     source_path=filename,
                     status="PENDING",
                     priority="NORMAL"
@@ -41,6 +43,8 @@ class DocumentHandler(FileSystemEventHandler):
                 db.add(new_doc)
                 db.commit()
                 db.refresh(new_doc)
+                add_document_event(db, new_doc.id, "uploaded", "Document was added to the processing queue by folder sync.")
+                db.commit()
                 
                 # We should trigger celery task here, but to avoid circular imports 
                 # in this script, we can just send it to celery via direct import or redis

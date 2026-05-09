@@ -13,7 +13,8 @@
     "error": "Произошла ошибка",
     "refresh": "Обновить",
     "delete": "Удалить",
-    "save": "Сохранить"
+    "save": "Сохранить",
+    "not_available": "Недоступно"
   },
   "dashboard": {
     "title": "Панель управления",
@@ -32,6 +33,12 @@
     "custom_name": "Имя модели в системе",
     "gguf_file": "Файл модели (.gguf)",
     "btn_upload": "Загрузить и установить",
+    "size": "Размер",
+    "format": "Формат",
+    "parameter_size": "Размер параметров",
+    "digest": "Digest",
+    "upload_failed": "Не удалось загрузить файл",
+    "network_upload_error": "Ошибка сети при загрузке файла",
     "recommendations": {
       "title": "Как выбирать модели?",
       "tags_title": "Разновидности тегов (Variants):",
@@ -56,6 +63,8 @@
     "prio_normal": "Средний",
     "prio_low": "Низкий",
     "btn_upload": "Загрузить",
+    "load_error": "Не удалось загрузить документы",
+    "delete_error": "Не удалось удалить документ",
     "list_title": "Загруженные документы",
     "no_documents": "Документы пока не загружены",
     "filename": "Имя файла",
@@ -65,24 +74,54 @@
     "status_completed": "Завершено",
     "status_error": "Ошибка",
     "date": "Дата загрузки",
+    "added_at": "Добавлен",
+    "processed_at": "Обработан",
     "actions": "Действия",
-    "confirm_delete": "Вы уверены, что хотите удалить этот документ?"
+    "confirm_delete": "Вы уверены, что хотите удалить этот документ?",
+    "retry": "Повторить",
+    "retry_error": "Не удалось повторно запустить обработку документа",
+    "history": "История",
+    "no_history": "История обработки пока пуста",
+    "not_processed": "Еще не обработан",
+    "overall_progress": "Общий прогресс: {{completed}}/{{total}}",
+    "queue_progress": "Очередь: {{completed}}/{{total}}",
+    "document_progress": "Документ: {{current}}/{{total}}",
+    "pages_progress": "{{current}}/{{total}} стр.",
+    "total_percent": "Всего: {{percent}}%",
+    "remaining_files": "Осталось файлов: {{count}}",
+    "current_document_percent": "Текущий документ: {{percent}}%",
+    "error_unexpected_pdf_structure": "Результат распознавания PDF имел неожиданный формат. Попробуйте обработать документ еще раз.",
+    "error_no_text": "Из документа не удалось извлечь текст. Возможно, он состоит только из изображений или нечитаемых страниц.",
+    "error_missing_file": "Исходный файл отсутствует на диске. Загрузите документ заново.",
+    "event_uploaded": "Добавлен",
+    "event_processing_started": "Обработка начата",
+    "event_processing_completed": "Обработка завершена",
+    "event_processing_failed": "Ошибка обработки",
+    "event_retry_requested": "Повторная обработка запрошена",
+    "event_retry_failed": "Повторная обработка не запущена"
   },
   "settings": {
     "title": "Настройки системы",
     "prompt_title": "Системный Промпт",
+    "default_model": "Модель чата по умолчанию",
     "prompt_description": "Настройте базовое поведение LLM. Опишите, как ассистент должен форматировать вывод и работать с контекстом.",
     "hint": "Справка:",
     "prompt_hint_text": "Для оптимальной работы RAG укажите модели строго использовать предоставленный контекст, сообщать об отсутствии ответа, если его нет в тексте, и использовать Markdown для форматирования ссылок и таблиц.",
     "prompt_saved": "Системный промпт успешно сохранен."
   },
   "chat": {
-    "title": "RAG Чат",
+    "title": "Чат",
     "welcome": "Привет! Я ИИ-ассистент Documentarno. Выберите документ из списка выше и задайте мне вопрос.",
+    "history": "История чатов хранится локально в этом браузере.",
+    "new_chat": "Новый чат",
+    "empty_history": "Сообщений пока нет",
+    "generating": "Генерация...",
+    "background_notice": "Другой чат всё ещё генерирует ответ в фоне. Он продолжится, даже если вы перейдёте на другую страницу.",
     "select_doc": "Выберите документ...",
     "typing": "Печатает...",
     "placeholder": "Задайте вопрос по документу...",
     "send": "Отправить",
+    "select_model": "Выберите модель",
     "error_response": "Не удалось получить ответ"
   },
   "pdf": {
@@ -95,11 +134,12 @@
   "layout": {
     "app_name": "DOCUMENTARNO",
     "nav_dashboard": "Панель управления",
-    "nav_chat": "RAG Чат",
+    "nav_chat": "Чат",
     "nav_documents": "Документы",
     "nav_models": "Model Hub",
     "nav_hardware": "Аппаратные ресурсы",
-    "nav_settings": "Настройки"
+    "nav_settings": "Настройки",
+    "switch_language": "Переключить язык"
   },
   "hardware": {
     "title": "Аппаратные ресурсы",

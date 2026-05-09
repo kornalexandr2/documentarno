@@ -4,40 +4,38 @@ import { initReactI18next } from 'react-i18next';
 import enTranslation from './locales/en.json';
 import ruTranslation from './locales/ru.json';
 
-const ruOverrides = {
-  chat: {
-    history: 'История чатов хранится локально в этом браузере.',
-    new_chat: 'Новый чат',
-    empty_history: 'Сообщений пока нет',
-    generating: 'Генерация...',
-    background_notice: 'Другой чат всё ещё генерирует ответ в фоне. Он продолжится, даже если вы перейдёте на другую страницу.',
-  },
-};
-
 const resources = {
   en: {
     translation: enTranslation,
   },
   ru: {
-    translation: {
-      ...ruTranslation,
-      chat: {
-        ...ruTranslation.chat,
-        ...ruOverrides.chat,
-      },
-    },
+    translation: ruTranslation,
   },
 };
+
+const supportedLanguages = ['en', 'ru'];
+const savedLanguage = window.localStorage.getItem('documentarno.language');
+const browserLanguage = window.navigator.language.split('-')[0];
+const initialLanguage = supportedLanguages.includes(savedLanguage || '')
+  ? savedLanguage
+  : supportedLanguages.includes(browserLanguage)
+    ? browserLanguage
+    : 'en';
 
 i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: 'ru', // default language
+    lng: initialLanguage || 'en',
     fallbackLng: 'en',
+    supportedLngs: supportedLanguages,
     interpolation: {
       escapeValue: false, // react already safes from xss
     },
   });
+
+i18n.on('languageChanged', (lng) => {
+  window.localStorage.setItem('documentarno.language', lng);
+});
 
 export default i18n;

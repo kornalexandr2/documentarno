@@ -111,7 +111,7 @@ const ModelHub: React.FC = () => {
 
           handleUnauthorizedStatus(xhr.status);
 
-          let message = xhr.statusText || 'Upload failed';
+          let message = xhr.statusText || t('models.upload_failed');
           try {
             const response = JSON.parse(xhr.responseText) as { detail?: string };
             message = response.detail || message;
@@ -122,7 +122,7 @@ const ModelHub: React.FC = () => {
         });
 
         xhr.addEventListener('error', () => {
-          reject(new Error('Network error during upload'));
+          reject(new Error(t('models.network_upload_error')));
         });
 
         xhr.open('POST', `${API_URL}/models/upload`);
@@ -193,10 +193,10 @@ const ModelHub: React.FC = () => {
                 {models.map((m) => (
                   <div key={m.digest} className="bg-gray-900 p-4 rounded border border-gray-700">
                     <h3 className="font-bold text-lg text-blue-400">{m.name}</h3>
-                    <p className="text-sm text-gray-400 mt-2">Size: {formatSize(m.size)}</p>
-                    <p className="text-sm text-gray-400">Format: {m.details?.format}</p>
-                    <p className="text-sm text-gray-400">Parameter Size: {m.details?.parameter_size}</p>
-                    <p className="text-xs text-gray-500 mt-4 truncate">Digest: {m.digest}</p>
+                    <p className="text-sm text-gray-400 mt-2">{t('models.size')}: {formatSize(m.size)}</p>
+                    <p className="text-sm text-gray-400">{t('models.format')}: {m.details?.format}</p>
+                    <p className="text-sm text-gray-400">{t('models.parameter_size')}: {m.details?.parameter_size}</p>
+                    <p className="text-xs text-gray-500 mt-4 truncate">{t('models.digest')}: {m.digest}</p>
                   </div>
                 ))}
               </div>

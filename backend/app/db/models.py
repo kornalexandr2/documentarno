@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, JSON, ForeignKey
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 
 Base = declarative_base()
@@ -22,6 +22,18 @@ class Document(Base):
     priority = Column(String, default='NORMAL')
     error_message = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    processed_at = Column(DateTime, nullable=True)
+    events = relationship("DocumentEvent", back_populates="document", cascade="all, delete-orphan", order_by="DocumentEvent.created_at.desc()")
+
+class DocumentEvent(Base):
+    __tablename__ = 'document_events'
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey('documents.id', ondelete='CASCADE'), nullable=False, index=True)
+    event_type = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    document = relationship("Document", back_populates="events")
 
 class ChatHistory(Base):
     __tablename__ = 'chat_history'

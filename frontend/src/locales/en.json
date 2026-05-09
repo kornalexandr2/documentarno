@@ -13,7 +13,8 @@
     "error": "An error occurred",
     "refresh": "Refresh",
     "delete": "Delete",
-    "save": "Save Changes"
+    "save": "Save Changes",
+    "not_available": "Not available"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -32,6 +33,12 @@
     "custom_name": "Custom Model Name",
     "gguf_file": "Model File (.gguf)",
     "btn_upload": "Upload and Install",
+    "size": "Size",
+    "format": "Format",
+    "parameter_size": "Parameter Size",
+    "digest": "Digest",
+    "upload_failed": "Upload failed",
+    "network_upload_error": "Network error during upload",
     "recommendations": {
       "title": "How to choose models?",
       "tags_title": "Understanding Tags (Variants):",
@@ -56,24 +63,54 @@
     "prio_normal": "Normal",
     "prio_low": "Low",
     "btn_upload": "Upload",
+    "load_error": "Failed to load documents",
+    "delete_error": "Failed to delete document",
     "list_title": "Uploaded Documents",
     "no_documents": "No documents uploaded yet",
     "filename": "Filename",
     "status": "Status",
+    "status_pending": "Pending",
+    "status_processing": "Processing",
+    "status_completed": "Completed",
+    "status_error": "Error",
     "date": "Upload Date",
+    "added_at": "Added",
+    "processed_at": "Processed",
     "actions": "Actions",
-    "confirm_delete": "Are you sure you want to delete this document?"
+    "confirm_delete": "Are you sure you want to delete this document?",
+    "retry": "Retry",
+    "retry_error": "Failed to retry document processing",
+    "history": "History",
+    "no_history": "No processing history yet",
+    "not_processed": "Not processed yet",
+    "overall_progress": "Overall progress: {{completed}}/{{total}}",
+    "queue_progress": "Queue: {{completed}}/{{total}}",
+    "document_progress": "Document: {{current}}/{{total}}",
+    "pages_progress": "{{current}}/{{total}} pages",
+    "total_percent": "Total: {{percent}}%",
+    "remaining_files": "Files left: {{count}}",
+    "current_document_percent": "Current document: {{percent}}%",
+    "error_unexpected_pdf_structure": "The PDF recognition result had an unexpected structure. Try processing the document again.",
+    "error_no_text": "No text could be extracted from this document. It may contain only images or unreadable pages.",
+    "error_missing_file": "The source file is missing from disk. Upload the document again.",
+    "event_uploaded": "Added",
+    "event_processing_started": "Processing started",
+    "event_processing_completed": "Processing completed",
+    "event_processing_failed": "Processing failed",
+    "event_retry_requested": "Retry requested",
+    "event_retry_failed": "Retry failed"
   },
   "settings": {
     "title": "System Settings",
     "prompt_title": "System Prompt Configuration",
+    "default_model": "Default chat model",
     "prompt_description": "Configure the initial behavior of the LLM. You should provide instructions on how the assistant should format the output and handle context.",
     "hint": "Hint:",
     "prompt_hint_text": "For optimal RAG performance, instruct the model to strictly use the provided context, inform the user if the answer is missing in the text, and use Markdown formatting for references (e.g., table structure, bold text).",
     "prompt_saved": "System prompt saved successfully."
   },
   "chat": {
-    "title": "RAG Chat",
+    "title": "Chat",
     "welcome": "Hi! I'm the Documentarno AI assistant. Select a document from the list above and ask me a question.",
     "history": "Chat history is kept locally in this browser.",
     "new_chat": "New chat",
@@ -84,6 +121,7 @@
     "typing": "Typing...",
     "placeholder": "Ask a question about the document...",
     "send": "Send",
+    "select_model": "Select model",
     "error_response": "Failed to get response"
   },
   "pdf": {
@@ -96,11 +134,12 @@
   "layout": {
     "app_name": "DOCUMENTARNO",
     "nav_dashboard": "Dashboard",
-    "nav_chat": "RAG Chat",
+    "nav_chat": "Chat",
     "nav_documents": "Documents",
     "nav_models": "Model Hub",
     "nav_hardware": "Hardware Dashboard",
-    "nav_settings": "Settings"
+    "nav_settings": "Settings",
+    "switch_language": "Switch language"
   },
   "hardware": {
     "title": "Hardware Dashboard",
@@ -141,7 +180,14 @@
     "current": "Current Mode:",
     "btn_change": "Switch to {{state}}",
     "search": "SEARCH",
-    "processing": "PROCESSING"
+    "processing": "PROCESSING",
+    "btn_reset_tasks": "Reset stuck tasks",
+    "logs_title": "System logs",
+    "logs_lines": "Line count",
+    "logs_level": "Level",
+    "logs_view_pretty": "Readable view",
+    "logs_view_raw": "Plain text",
+    "logs_empty": "Logs are empty or the file has not been created yet"
   }
 }
 

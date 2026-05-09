@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import List
 
@@ -10,6 +11,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin_user, get_current_user
+from app.core.document_events import add_document_event
 from app.core.redis import get_redis
 from app.db.models import Document, User
 from app.db.session import get_db
@@ -56,7 +58,7 @@ async def upload_document(
     extension = os.path.splitext(original_filename.lower())[1]
     
     if extension not in {".pdf", ".docx"}:
-        raise HTTPException(status_code=400, detail="Only PDF and DOCX files are allowed")
+        raise HTTPException(status_code=400, detail="Upload a PDF or DOCX document.")
 
     # Create safe internal filename using UUID to avoid ANY issues with cyrillic/long names
     internal_filename = f"{uuid.uuid4()}{extension}"
@@ -68,7 +70,7 @@ async def upload_document(
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not save file: {e}") from e
+        raise HTTPException(status_code=500, detail=f"Could not save the uploaded file: {e}") from e
 
     new_doc = Document(
         filename=original_filename,
@@ -80,9 +82,44 @@ async def upload_document(
     db.commit()
     db.refresh(new_doc)
 
-    ocr_heavy.apply_async(args=[new_doc.id], task_id=f"ocr_{new_doc.id}")
+    add_document_event(db, new_doc.id, "uploaded", "Document was added to the processing queue.")
+    db.commit()
+    db.refresh(new_doc)
+
+    ocr_heavy.apply_async(args=[new_doc.id], task_id=f"ocr_{new_doc.id}_{uuid.uuid4().hex}")
 
     return new_doc
+
+
+@router.post("/{doc_id}/retry", response_model=DocumentResponse)
+async def retry_document_processing(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    file_path = resolve_document_path(doc.source_path)
+    if not file_path.exists():
+        doc.status = "ERROR"
+        doc.error_message = "The source file is missing from disk. Upload the document again."
+        doc.updated_at = datetime.utcnow()
+        add_document_event(db, doc.id, "retry_failed", doc.error_message)
+        db.commit()
+        db.refresh(doc)
+        raise HTTPException(status_code=404, detail=doc.error_message)
+
+    doc.status = "PENDING"
+    doc.error_message = None
+    doc.updated_at = datetime.utcnow()
+    add_document_event(db, doc.id, "retry_requested", "Document was sent for processing again.")
+    db.commit()
+    db.refresh(doc)
+
+    ocr_heavy.apply_async(args=[doc.id], task_id=f"ocr_{doc.id}_{uuid.uuid4().hex}")
+    return doc
 
 
 @router.post("/reset-stuck")
@@ -94,7 +131,9 @@ async def reset_stuck_documents(
     for doc in docs:
         doc.status = "PENDING"
         doc.error_message = None
-        ocr_heavy.apply_async(args=[doc.id], task_id=f"ocr_{doc.id}")
+        doc.updated_at = datetime.utcnow()
+        add_document_event(db, doc.id, "retry_requested", "Document was reset and sent for processing again.")
+        ocr_heavy.apply_async(args=[doc.id], task_id=f"ocr_{doc.id}_{uuid.uuid4().hex}")
     
     db.commit()
     return {"status": "success", "reset_count": len(docs)}
@@ -128,11 +167,11 @@ async def download_document(
 ):
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=404, detail="Document not found.")
 
     file_path = resolve_document_path(doc.source_path)
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found on disk")
+        raise HTTPException(status_code=404, detail="The source file is missing from disk.")
 
     media_type = "application/pdf"
     if doc.source_path.lower().endswith(".docx"):
@@ -149,7 +188,7 @@ async def delete_document(
 ):
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=404, detail="Document not found.")
 
     file_path = resolve_document_path(doc.source_path)
     if file_path.exists():

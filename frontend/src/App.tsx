@@ -4,7 +4,6 @@ import { AuthProvider } from './context/AuthContext';
 import { ChatProvider } from './context/ChatContext';
 
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
 import ModelHub from './pages/ModelHub';
 import HardwareDashboard from './pages/HardwareDashboard';
 import Documents from './pages/Documents';
@@ -21,7 +20,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             
             <Route path="/" element={<DashboardLayout />}>
-              <Route index element={<Dashboard />} />
+              <Route index element={<Navigate to="/chat" replace />} />
               <Route path="chat" element={<Chat />} />
               <Route path="models" element={<ModelHub />} />
               <Route path="hardware" element={<HardwareDashboard />} />
@@ -38,7 +37,6 @@ function App() {
 }
 
 export default App;
-
 
 
 

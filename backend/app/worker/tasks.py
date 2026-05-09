@@ -10,8 +10,34 @@ from app.db.models import SystemMetric, Document, AuditLog
 from app.worker.celery_app import celery_app
 from app.core.metrics import get_live_metrics
 from app.core.events import emit_event_sync
+from app.core.document_events import add_document_event
 
 logger = logging.getLogger(__name__)
+
+
+def humanize_processing_error(exc: Exception) -> str:
+    message = str(exc).strip() or exc.__class__.__name__
+    lower = message.lower()
+
+    if "string indices must be integers" in lower:
+        return (
+            "PDF recognition returned an unexpected page structure. "
+            "The file can be retried; if the error repeats, check that the PDF is not damaged."
+        )
+    if "no text could be extracted" in lower:
+        return "No text could be extracted from this document. It may contain only images or unreadable pages."
+    if "does not contain pages" in lower:
+        return "The PDF does not contain readable pages."
+    if "failed to initialize ocr engine" in lower:
+        return "The OCR engine could not be started. Check OCR/GPU dependencies and retry processing."
+    if "could not recognize page" in lower:
+        return message
+    if "unsupported extension" in lower:
+        return "This file type is not supported. Upload a PDF or DOCX file."
+    if "not found" in lower or "no such file" in lower:
+        return "The source file is missing from disk. Upload the document again."
+
+    return f"Document processing failed: {message}"
 
 
 def build_ocr_progress_payload(db: Session, redis_conn: redis.Redis, doc_id: int, filename: str, current: int, total: int) -> dict:
@@ -107,8 +133,11 @@ def ocr_heavy(self, doc_id: int):
         db.close()
         return
 
+    r_sync = None
     doc.status = "PROCESSING"
     doc.error_message = None
+    doc.updated_at = datetime.utcnow()
+    add_document_event(db, doc.id, "processing_started", "Document processing started.")
     db.commit()
 
     redis_host = os.getenv("REDIS_HOST", "redis")
@@ -117,7 +146,7 @@ def ocr_heavy(self, doc_id: int):
 
     try:
         from app.worker.ocr import process_pdf_to_markdown, process_docx_to_markdown
-        from app.core.embeddings import process_and_store_document
+        from app.core.embeddings import delete_document_vectors, process_and_store_document
         
         doc_source_path = os.getenv("DOC_SOURCE_PATH", "/app/doc_source")
         file_path = os.path.join(doc_source_path, doc.source_path)
@@ -137,28 +166,39 @@ def ocr_heavy(self, doc_id: int):
             markdown_text = process_docx_to_markdown(file_path)
         else:
             raise ValueError(f"Unsupported extension: {ext}")
-        
+
+        try:
+            delete_document_vectors(doc_id)
+        except Exception as vector_delete_exc:
+            logger.warning("Failed to delete existing vectors for document ID %s: %s", doc_id, vector_delete_exc)
+
         process_and_store_document(doc_id, markdown_text)
         
         doc.status = "COMPLETED"
+        doc.processed_at = datetime.utcnow()
+        doc.updated_at = doc.processed_at
+        add_document_event(db, doc.id, "processing_completed", "Document processing completed successfully.")
         db.commit()
         logger.info(f"Successfully processed document ID: {doc_id}")
 
     except Exception as e:
-        error_msg = str(e)
+        error_msg = humanize_processing_error(e)
         logger.error(f"OCR Task failed for document ID {doc_id}: {error_msg}")
         doc.status = "ERROR"
         doc.error_message = error_msg
+        doc.updated_at = datetime.utcnow()
+        add_document_event(db, doc.id, "processing_failed", error_msg)
         db.commit()
     finally:
         # Check if queue is empty to auto-switch state
         pending_remaining = db.query(Document).filter(Document.status.in_(["PENDING", "PROCESSING"])).count()
-        if pending_remaining == 0:
+        if r_sync and pending_remaining == 0:
             logger.info("Queue empty. Switching state to SEARCH.")
             r_sync.set("APP_STATE", "SEARCH")
             emit_event_sync("STATE_CHANGED", {"new_state": "SEARCH", "by": "system"})
-        
-        r_sync.delete("OCR_PROGRESS")
+
+        if r_sync:
+            r_sync.delete("OCR_PROGRESS")
         db.close()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
